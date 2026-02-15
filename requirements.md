@@ -57,7 +57,7 @@ This document specifies requirements for a secure, stateless, serverless AI comp
 
 #### Acceptance Criteria
 
-1. WHEN an email is retrieved, THE Extraction_Engine SHALL analyze the content using AWS Bedrock or SageMaker
+1. WHEN an email is retrieved, THE Extraction_Engine SHALL analyze the content using AWS Bedrock
 2. THE Extraction_Engine SHALL identify compliance-related keywords (filing, deadline, tax, GST, ROC, labor, environmental)
 3. WHEN a Compliance_Notice is identified, THE System SHALL extract the issuing authority, subject matter, and reference numbers
 4. THE System SHALL extract structured data including compliance type, applicable regulations, and required actions
@@ -193,13 +193,15 @@ This document specifies requirements for a secure, stateless, serverless AI comp
 #### Acceptance Criteria
 
 1. WHEN a new Compliance_Notice is identified, THE System SHALL send a notification to the User within 1 hour
-2. THE System SHALL support notification delivery via email and SMS using AWS SNS
+2. THE System SHALL support notification delivery via email, SMS, and WhatsApp using AWS SNS and WhatsApp Business API
 3. WHEN a Deadline approaches, THE System SHALL send reminder notifications at configured intervals
 4. THE System SHALL include compliance type, deadline date, risk level, and required actions in notifications
 5. WHEN Risk_Level is Critical, THE System SHALL send immediate notifications regardless of schedule
-6. THE System SHALL allow users to configure notification preferences and quiet hours
+6. THE System SHALL allow users to configure notification preferences (email, SMS, WhatsApp) and quiet hours
 7. THE System SHALL batch non-critical notifications to avoid notification fatigue
 8. WHEN notifications fail to deliver, THE System SHALL retry up to 3 times and log delivery failures
+9. THE System SHALL send WhatsApp notifications using rich formatting with action buttons for quick acknowledgment
+10. WHEN WhatsApp delivery fails, THE System SHALL fall back to SMS and email notifications
 
 ### Requirement 13: API and Integration
 

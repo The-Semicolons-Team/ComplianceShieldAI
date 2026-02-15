@@ -10,96 +10,11 @@ The architecture follows AWS Well-Architected Framework principles with emphasis
 
 ### High-Level Architecture
 
-```mermaid
-graph TB
-    subgraph "External Services"
-        Email[Email Providers<br/>Gmail/Outlook]
-    end
-    
-    subgraph "AWS Cloud - India Region"
-        subgraph "API Layer"
-            APIGW[API Gateway<br/>REST API]
-            WAF[AWS WAF<br/>Protection]
-        end
-        
-        subgraph "Authentication"
-            Cognito[Amazon Cognito<br/>User Pool]
-            Secrets[AWS Secrets Manager<br/>OAuth Tokens]
-        end
-        
-        subgraph "Processing Layer"
-            EventBridge[EventBridge<br/>Scheduler]
-            SQS[SQS Queue<br/>Email Processing]
-            Lambda1[Lambda<br/>Email Retrieval]
-            Lambda2[Lambda<br/>Compliance Extraction]
-            Lambda3[Lambda<br/>Risk Assessment]
-            Lambda4[Lambda<br/>Notification Handler]
-        end
-        
-        subgraph "AI/ML Layer"
-            Bedrock[Amazon Bedrock<br/>LLM Analysis]
-            Textract[Amazon Textract<br/>Document Extraction]
-            Comprehend[Amazon Comprehend<br/>NLP]
-        end
-        
-        subgraph "Storage Layer"
-            DDB[DynamoDB<br/>Metadata Store]
-            S3[S3 Bucket<br/>Temp Storage]
-        end
-        
-        subgraph "Security & Monitoring"
-            KMS[AWS KMS<br/>Encryption]
-            CloudWatch[CloudWatch<br/>Logs & Metrics]
-            XRay[AWS X-Ray<br/>Tracing]
-            CloudTrail[CloudTrail<br/>Audit Logs]
-        end
-        
-        subgraph "Notification"
-            SNS[Amazon SNS<br/>Alerts]
-            SES[Amazon SES<br/>Email Notifications]
-        end
-    end
-    
-    Email -->|OAuth 2.0| Lambda1
-    APIGW --> WAF
-    WAF --> Lambda1
-    WAF --> Lambda4
-    
-    Cognito --> APIGW
-    Lambda1 --> Secrets
-    
-    EventBridge -->|Scheduled| Lambda1
-    Lambda1 --> SQS
-    SQS --> Lambda2
-    Lambda2 --> Lambda3
-    Lambda3 --> Lambda4
-    
-    Lambda2 --> Bedrock
-    Lambda2 --> Textract
-    Lambda2 --> Comprehend
-    
-    Lambda2 --> DDB
-    Lambda3 --> DDB
-    Lambda2 --> S3
-    
-    KMS --> DDB
-    KMS --> Secrets
-    KMS --> S3
-    
-    Lambda1 --> CloudWatch
-    Lambda2 --> CloudWatch
-    Lambda3 --> CloudWatch
-    Lambda4 --> CloudWatch
-    
-    Lambda2 --> XRay
-    Lambda3 --> XRay
-    
-    Lambda4 --> SNS
-    Lambda4 --> SES
-    
-    CloudTrail -.->|Audit| DDB
-    CloudTrail -.->|Audit| Secrets
-```
+![High-level architecture](docs/images/highlevel-diagram.png)
+
+### Detailed AWS Architecture
+
+![ComplianceShield detailed AWS architecture](docs/images/detail.png)
 
 ### Architecture Principles
 
@@ -121,38 +36,7 @@ graph TB
 - **AWS WAF**: Web application firewall with managed rule sets for OWASP Top 10 protection
 - **Amazon Cognito**: User pool for authentication with MFA support
 
-**Interfaces**:
-```
-POST /auth/oauth/initiate
-  Request: { provider: "gmail" | "outlook" }
-  Response: { authorizationUrl: string, state: string }
-
-POST /auth/oauth/callback
-  Request: { code: string, state: string }
-  Response: { userId: string, status: "connected" }
-
-GET /compliance/notices
-  Query: { startDate?: ISO8601, endDate?: ISO8601, category?: string, riskLevel?: string }
-  Response: { notices: ComplianceNotice[], nextToken?: string }
-
-GET /compliance/notices/{noticeId}
-  Response: ComplianceNotice
-
-PUT /compliance/notices/{noticeId}/acknowledge
-  Request: { acknowledgedBy: string, notes?: string }
-  Response: { status: "acknowledged", timestamp: ISO8601 }
-
-GET /compliance/deadlines
-  Query: { daysAhead?: number, riskLevel?: string }
-  Response: { deadlines: Deadline[] }
-
-POST /notifications/preferences
-  Request: { email: boolean, sms: boolean, quietHours: { start: string, end: string } }
-  Response: { status: "updated" }
-
-GET /health
-  Response: { status: "healthy", timestamp: ISO8601 }
-```
+**Interfaces**: OAuth initiate/callback, compliance notices (list, get, acknowledge), deadlines (query), notification preferences, WhatsApp verify/confirm, health check.
 
 **Security**:
 - API Gateway uses Cognito authorizer for JWT validation
@@ -179,33 +63,9 @@ GET /health
 7. Sends each batch to SQS queue for processing
 8. Updates last processed timestamp in DynamoDB
 
-**OAuth Implementation**:
-```
-OAuth Flow:
-1. User initiates: GET /auth/oauth/initiate?provider=gmail
-2. System generates state token, stores in DynamoDB with TTL
-3. Returns authorization URL to user
-4. User authorizes, provider redirects to callback
-5. System validates state token
-6. Exchanges authorization code for access/refresh tokens
-7. Encrypts tokens with KMS
-8. Stores in Secrets Manager with user association
-9. Sets up automatic token rotation (45 days)
-```
+**OAuth Implementation**: User initiates → state token stored → authorization URL returned → user authorizes → callback → state validated → code exchanged for tokens → encrypt with KMS → store in Secrets Manager → automatic rotation (45 days).
 
-**Email Filtering Logic**:
-```
-Filter Criteria:
-- Sender domain matches: *.gov.in, *.nic.in
-- Not in processed_emails DynamoDB table
-- Received date > last_processed_timestamp
-- Subject or body contains compliance keywords (configurable)
-
-Batch Processing:
-- Max 100 emails per batch
-- Each batch sent as single SQS message
-- SQS message includes: emailIds[], userId, batchId
-```
+**Email Filtering Logic**: Filter by sender domain (*.gov.in, *.nic.in), exclude already processed, received after last run, optional keyword match. Batch processing: max 100 emails per batch, one SQS message per batch (emailIds, userId, batchId).
 
 **Error Handling**:
 - OAuth token refresh failure: Notify user, mark integration as disconnected
@@ -237,68 +97,11 @@ Batch Processing:
 7. Delete temporary files from /tmp
 8. Delete SQS message on success
 
-**AI Prompt Structure**:
-```
-System Prompt:
-You are an AI assistant specialized in analyzing Indian government compliance notices. 
-Extract structured information from the provided text.
+**AI Prompt**: System prompt for Indian government compliance notices; user prompt includes subject, sender, date, body, attachment text. Output: isComplianceNotice, complianceType (Tax|Labor|Environmental|Corporate|Trade|Other), issuingAuthority, referenceNumber, subject, deadlines (date, type, description), requiredActions, penalties (amount, currency, description), applicableRegulations, keywords. Non-notices return minimal data.
 
-User Prompt:
-Analyze the following email and extract compliance information:
+**Textract**: Download attachment → upload to S3 (24h lifecycle) → async text detection → poll until done (max 60s) → concatenate text → delete from S3.
 
-Email Subject: {subject}
-Email From: {sender}
-Email Date: {date}
-Email Body: {body}
-Attachment Text: {attachment_text}
-
-Extract and return JSON with the following structure:
-{
-  "isComplianceNotice": boolean,
-  "complianceType": "Tax" | "Labor" | "Environmental" | "Corporate" | "Trade" | "Other",
-  "issuingAuthority": string,
-  "referenceNumber": string,
-  "subject": string,
-  "deadlines": [
-    {
-      "date": "YYYY-MM-DD",
-      "type": "filing" | "payment" | "submission" | "response",
-      "description": string
-    }
-  ],
-  "requiredActions": string[],
-  "penalties": {
-    "amount": number,
-    "currency": "INR",
-    "description": string
-  },
-  "applicableRegulations": string[],
-  "keywords": string[]
-}
-
-If this is not a compliance notice, set isComplianceNotice to false and return minimal data.
-```
-
-**Textract Integration**:
-```
-For PDF/Image Attachments:
-1. Download attachment to /tmp/{filename}
-2. Upload to S3 temp bucket with 24-hour lifecycle policy
-3. Call Textract StartDocumentTextDetection (async)
-4. Poll GetDocumentTextDetection until complete (max 60s)
-5. Extract text blocks and concatenate
-6. Delete from S3 after extraction
-```
-
-**Comprehend Enhancement**:
-```
-After Bedrock extraction:
-1. Call DetectEntities on combined text
-2. Extract: ORGANIZATION, DATE, LOCATION, QUANTITY
-3. Call DetectKeyPhrases for additional context
-4. Merge entities with Bedrock results
-5. Improve deadline detection accuracy
-```
+**Comprehend**: After Bedrock: DetectEntities (ORGANIZATION, DATE, LOCATION, QUANTITY), DetectKeyPhrases, merge with Bedrock results for better deadline detection.
 
 **Error Handling**:
 - Bedrock throttling: Exponential backoff, max 3 retries
@@ -315,57 +118,12 @@ After Bedrock extraction:
 - **DynamoDB**: Reads compliance metadata and historical data
 
 **Risk Calculation Algorithm**:
-```python
-def calculate_risk_level(notice: ComplianceNotice, history: ComplianceHistory) -> RiskLevel:
-    score = 0
-    
-    # Deadline proximity scoring
-    days_until_deadline = (notice.deadline - today).days
-    if days_until_deadline <= 7:
-        score += 40
-    elif days_until_deadline <= 14:
-        score += 30
-    elif days_until_deadline <= 30:
-        score += 20
-    else:
-        score += 10
-    
-    # Penalty severity scoring
-    if notice.penalty_amount >= 100000:
-        score += 30
-    elif notice.penalty_amount >= 50000:
-        score += 20
-    elif notice.penalty_amount >= 10000:
-        score += 10
-    else:
-        score += 5
-    
-    # Compliance category weighting
-    category_weights = {
-        "Tax": 1.2,
-        "Labor": 1.1,
-        "Corporate": 1.15,
-        "Environmental": 1.0,
-        "Trade": 1.0
-    }
-    score *= category_weights.get(notice.category, 1.0)
-    
-    # Historical compliance scoring
-    if history.missed_deadlines_count > 0:
-        score += 15
-    if history.repeat_violation:
-        score += 10
-    
-    # Determine risk level
-    if score >= 70:
-        return "Critical"
-    elif score >= 50:
-        return "High"
-    elif score >= 30:
-        return "Medium"
-    else:
-        return "Low"
-```
+
+1. **Deadline proximity**: Score +40 if ≤7 days, +30 if ≤14 days, +20 if ≤30 days, +10 otherwise.
+2. **Penalty severity**: Score +30 if ≥₹1,00,000, +20 if ≥₹50,000, +10 if ≥₹10,000, +5 otherwise.
+3. **Category weight**: Multiply score by 1.2 (Tax), 1.15 (Corporate), 1.1 (Labor), 1.0 (Environmental, Trade).
+4. **History**: +15 if any missed deadlines; +10 if repeat violation.
+5. **Risk level**: Critical if score ≥70, High if ≥50, Medium if ≥30, Low otherwise.
 
 **Processing Flow**:
 1. Triggered after compliance extraction completes
@@ -377,13 +135,7 @@ def calculate_risk_level(notice: ComplianceNotice, history: ComplianceHistory) -
 7. If risk level is Critical, trigger immediate notification
 8. Schedule reminder notifications based on risk level
 
-**Reminder Schedule**:
-```
-Critical: Immediate + 1 day before deadline
-High: 7 days + 1 day before deadline
-Medium: 14 days + 3 days before deadline
-Low: 30 days before deadline
-```
+**Reminder Schedule**: Critical → immediate + 1 day before; High → 7 days + 1 day before; Medium → 14 days + 3 days before; Low → 30 days before deadline.
 
 ### 5. Notification Service
 
@@ -393,6 +145,8 @@ Low: 30 days before deadline
 - **Lambda Function**: `notification-handler` (Node.js 20.x on ARM64, 512MB memory)
 - **Amazon SNS**: Multi-channel notification delivery (email, SMS)
 - **Amazon SES**: Transactional email delivery
+- **WhatsApp Business API**: Rich WhatsApp notifications with action buttons
+- **AWS Secrets Manager**: Stores WhatsApp API credentials
 - **EventBridge**: Scheduled reminder checks
 
 **Notification Types**:
@@ -407,59 +161,37 @@ Low: 30 days before deadline
    - EventBridge schedule (daily reminder check at 9 AM IST)
    - DynamoDB Stream (risk level changes)
 2. Query DynamoDB for notices requiring notifications
-3. Check user notification preferences
-4. Respect quiet hours configuration
+3. Check user notification preferences (email, SMS, WhatsApp)
+4. Respect quiet hours configuration (Critical overrides)
 5. Batch non-critical notifications
-6. Format notification content
-7. Send via SNS (email) or SNS (SMS)
-8. Update notification_sent timestamp in DynamoDB
-9. Log delivery status
+6. Format notification content based on channel
+7. Send via preferred channels:
+   - WhatsApp: Rich message with action buttons (primary)
+   - Email: Via SES with formatted HTML
+   - SMS: Via SNS with concise text
+8. Implement fallback chain: WhatsApp → SMS → Email
+9. Update notification_sent timestamp in DynamoDB
+10. Log delivery status per channel
 
-**Notification Content Template**:
-```
-Subject: [RISK_LEVEL] Compliance Deadline: {compliance_type}
+**Templates**: Email (subject, body with compliance type, authority, deadline, risk, actions, penalties, reference). WhatsApp: template with header (risk alert), body parameters, quick-reply (acknowledge), URL button. SMS: one-line risk + type + deadline + authority + ref.
 
-Dear {user_name},
-
-A compliance notice requires your attention:
-
-Compliance Type: {compliance_type}
-Issuing Authority: {issuing_authority}
-Deadline: {deadline_date} ({days_remaining} days remaining)
-Risk Level: {risk_level}
-
-Required Actions:
-{required_actions}
-
-Penalties: {penalty_description}
-
-Reference: {reference_number}
-
-Please take necessary action before the deadline.
-
----
-AI Compliance Monitoring System
-```
-
-**Batching Logic**:
-```
-Batching Rules:
-- Critical: Send immediately, no batching
-- High: Send immediately, no batching
-- Medium: Batch up to 5 notices, send once per day
-- Low: Batch up to 10 notices, send once per week
-
-Quiet Hours:
-- Check user preferences for quiet hours
-- If current time in quiet hours, schedule for next available time
-- Critical notices override quiet hours
-```
+**Batching**: Critical/High → send immediately, all channels. Medium → up to 5 notices per day. Low → up to 10 per week. Quiet hours respected; Critical overrides. Channel order: WhatsApp → Email → SMS.
 
 **Error Handling**:
+- WhatsApp delivery failure: Retry 3 times, then fall back to SMS
+- SMS delivery failure: Fall back to email notification
 - SNS delivery failure: Retry 3 times with exponential backoff
 - SES bounce/complaint: Mark email as invalid, notify admin
-- SMS delivery failure: Fall back to email notification
+- WhatsApp rate limiting: Queue messages, respect API limits (80 msg/sec)
 - Rate limiting: Queue notifications, process in next batch
+
+**WhatsApp Integration**:
+- Use WhatsApp Business API via official provider (e.g., Twilio, MessageBird)
+- Store API credentials in AWS Secrets Manager
+- Verify phone numbers before enabling WhatsApp notifications
+- Support interactive buttons for quick actions (Acknowledge, View Details)
+- Handle webhook callbacks for delivery status and user responses
+- Respect WhatsApp messaging policies (24-hour window for non-template messages)
 
 ## Data Models
 
@@ -469,57 +201,7 @@ Quiet Hours:
 - Partition Key: `user_id` (String)
 - Sort Key: `notice_id` (String, UUID v4)
 
-**Attributes**:
-```json
-{
-  "user_id": "string (UUID)",
-  "notice_id": "string (UUID)",
-  "email_id": "string",
-  "email_subject": "string",
-  "email_sender": "string",
-  "email_received_date": "string (ISO8601)",
-  "processed_timestamp": "string (ISO8601)",
-  
-  "is_compliance_notice": "boolean",
-  "compliance_type": "string (Tax|Labor|Environmental|Corporate|Trade|Other)",
-  "compliance_category": "string",
-  "issuing_authority": "string",
-  "reference_number": "string",
-  "subject": "string",
-  
-  "deadlines": [
-    {
-      "date": "string (ISO8601)",
-      "type": "string (filing|payment|submission|response)",
-      "description": "string",
-      "days_remaining": "number"
-    }
-  ],
-  
-  "required_actions": ["string"],
-  "penalties": {
-    "amount": "number",
-    "currency": "string",
-    "description": "string"
-  },
-  "applicable_regulations": ["string"],
-  "keywords": ["string"],
-  
-  "risk_level": "string (Critical|High|Medium|Low)",
-  "risk_score": "number",
-  "risk_factors": ["string"],
-  
-  "status": "string (pending|acknowledged|completed|expired)",
-  "acknowledged_by": "string",
-  "acknowledged_at": "string (ISO8601)",
-  "notes": "string",
-  
-  "notification_sent": "boolean",
-  "notification_timestamps": ["string (ISO8601)"],
-  
-  "ttl": "number (Unix timestamp)"
-}
-```
+**Attributes**: user_id, notice_id, email_id, subject, sender, dates; compliance fields (type, category, authority, reference, deadlines with date/type/description, required_actions, penalties, regulations, keywords); risk_level, risk_score, risk_factors; status, acknowledged_by/at, notes; notification_sent, timestamps; ttl.
 
 **Global Secondary Indexes**:
 
@@ -552,22 +234,7 @@ Quiet Hours:
 - Partition Key: `user_id` (String)
 - Sort Key: `provider` (String, "gmail" or "outlook")
 
-**Attributes**:
-```json
-{
-  "user_id": "string (UUID)",
-  "provider": "string (gmail|outlook)",
-  "email_address": "string",
-  "connected_at": "string (ISO8601)",
-  "last_sync_timestamp": "string (ISO8601)",
-  "last_processed_email_id": "string",
-  "oauth_secret_arn": "string (Secrets Manager ARN)",
-  "status": "string (connected|disconnected|error)",
-  "error_message": "string",
-  "sync_frequency_hours": "number (default: 4)",
-  "filter_domains": ["string (default: ['.gov.in', '.nic.in'])"]
-}
-```
+**Attributes**: user_id, provider, email_address, connected_at, last_sync_timestamp, last_processed_email_id, oauth_secret_arn, status, error_message, sync_frequency_hours (default 4), filter_domains (default .gov.in, .nic.in).
 
 **Encryption**: AWS KMS customer-managed key
 
@@ -577,17 +244,7 @@ Quiet Hours:
 - Partition Key: `user_id` (String)
 - Sort Key: `email_id` (String)
 
-**Attributes**:
-```json
-{
-  "user_id": "string (UUID)",
-  "email_id": "string",
-  "processed_at": "string (ISO8601)",
-  "is_compliance_notice": "boolean",
-  "notice_id": "string (UUID, if compliance notice)",
-  "ttl": "number (Unix timestamp, 90 days)"
-}
-```
+**Attributes**: user_id, email_id, processed_at, is_compliance_notice, notice_id (if notice), ttl (90 days).
 
 **Purpose**: Prevents duplicate processing of emails
 
@@ -598,44 +255,11 @@ Quiet Hours:
 **Primary Key**:
 - Partition Key: `user_id` (String)
 
-**Attributes**:
-```json
-{
-  "user_id": "string (UUID)",
-  "email_enabled": "boolean (default: true)",
-  "sms_enabled": "boolean (default: false)",
-  "phone_number": "string (E.164 format)",
-  "quiet_hours": {
-    "enabled": "boolean",
-    "start": "string (HH:MM)",
-    "end": "string (HH:MM)",
-    "timezone": "string (Asia/Kolkata)"
-  },
-  "batch_non_critical": "boolean (default: true)",
-  "critical_override_quiet_hours": "boolean (default: true)",
-  "reminder_schedule": {
-    "critical": ["number (days before)"],
-    "high": ["number (days before)"],
-    "medium": ["number (days before)"],
-    "low": ["number (days before)"]
-  }
-}
-```
+**Attributes**: user_id; email_enabled, sms_enabled, whatsapp_enabled (defaults true/false/false); phone_number, whatsapp_verified, whatsapp_opt_in_timestamp; channel_priority (whatsapp|email|sms); quiet_hours (enabled, start, end, timezone Asia/Kolkata); batch_non_critical, critical_override_quiet_hours; reminder_schedule per risk level (days before).
 
 ### AWS Secrets Manager: OAuth Tokens
 
-**Secret Structure**:
-```json
-{
-  "user_id": "string (UUID)",
-  "provider": "string (gmail|outlook)",
-  "access_token": "string (encrypted)",
-  "refresh_token": "string (encrypted)",
-  "token_type": "Bearer",
-  "expires_at": "string (ISO8601)",
-  "scope": "string"
-}
-```
+**Secret Structure**: user_id, provider, access_token, refresh_token (encrypted), token_type Bearer, expires_at, scope.
 
 **Rotation**: Automatic every 45 days using Lambda rotation function
 
@@ -852,6 +476,18 @@ Quiet Hours:
 
 **Validates: Requirements 12.4**
 
+### Property 34a: WhatsApp Rich Notification Format
+
+*For any* WhatsApp notification sent, the message must use the approved template format with interactive buttons for acknowledgment and viewing details.
+
+**Validates: Requirements 12.9**
+
+### Property 34b: WhatsApp Delivery Fallback
+
+*For any* failed WhatsApp notification delivery after 3 retries, the system must automatically fall back to SMS and then email notifications.
+
+**Validates: Requirements 12.10**
+
 ### Property 35: Critical Notice Immediate Notification
 
 *For any* compliance notice with Critical risk level, the system must send an immediate notification regardless of scheduled intervals or quiet hours configuration.
@@ -972,8 +608,11 @@ Quiet Hours:
 - **KMS Key Unavailable**: Fail operation; alert administrators immediately; queue for retry
 
 **5. Notification Errors**
+- **WhatsApp Delivery Failure**: Retry 3 times with exponential backoff; fall back to SMS then email
+- **WhatsApp Rate Limiting**: Queue messages; respect 80 msg/sec limit; retry after rate limit window
+- **WhatsApp Template Rejection**: Log error; fall back to SMS/email; alert admin to fix template
 - **SNS Delivery Failure**: Retry 3 times with exponential backoff; log failure; alert administrators
-- **SES Bounce**: Mark email as invalid; disable email notifications; notify via SMS if available
+- **SES Bounce**: Mark email as invalid; disable email notifications; notify via WhatsApp/SMS if available
 - **SMS Delivery Failure**: Fall back to email notification; log delivery failure
 - **Webhook Timeout**: Retry 3 times; if fails, log and continue; don't block processing
 
@@ -986,26 +625,7 @@ Quiet Hours:
 
 ### Error Logging Standards
 
-All errors must be logged with the following structure:
-```json
-{
-  "timestamp": "ISO8601",
-  "level": "ERROR",
-  "service": "service-name",
-  "operation": "operation-name",
-  "user_id": "uuid (redacted if sensitive)",
-  "trace_id": "x-ray-trace-id",
-  "error_code": "ERROR_CODE",
-  "error_message": "Human-readable message",
-  "error_details": {
-    "exception_type": "ExceptionClass",
-    "stack_trace": "Sanitized stack trace",
-    "context": {}
-  },
-  "retry_count": 0,
-  "sent_to_dlq": false
-}
-```
+All errors must be logged with: timestamp, level ERROR, service, operation, user_id (redacted), trace_id, error_code, error_message, error_details (exception_type, stack_trace, context), retry_count, sent_to_dlq.
 
 ### Dead Letter Queue Processing
 
@@ -1044,74 +664,7 @@ This system requires both unit testing and property-based testing for comprehens
 - Each property test must reference its design document property
 - Tag format: `Feature: ai-compliance-monitoring-msme, Property {number}: {property_text}`
 
-**Property Test Examples**:
-
-```typescript
-// Property 3: Government Domain Email Filtering
-import fc from 'fast-check';
-
-test('Feature: ai-compliance-monitoring-msme, Property 3: Government domain email filtering', () => {
-  fc.assert(
-    fc.property(
-      fc.array(fc.record({
-        from: fc.oneof(
-          fc.constant('notice@gst.gov.in'),
-          fc.constant('alert@mca.gov.in'),
-          fc.constant('info@nic.in'),
-          fc.constant('spam@example.com'),
-          fc.constant('user@gmail.com')
-        ),
-        subject: fc.string(),
-        body: fc.string()
-      })),
-      (emails) => {
-        const filtered = filterGovernmentEmails(emails);
-        // All filtered emails must be from government domains
-        return filtered.every(email => 
-          email.from.endsWith('.gov.in') || email.from.endsWith('.nic.in')
-        );
-      }
-    ),
-    { numRuns: 100 }
-  );
-});
-```
-
-```python
-# Property 20: Risk Level Calculation
-from hypothesis import given, strategies as st
-
-@given(
-    days_until_deadline=st.integers(min_value=1, max_value=365),
-    penalty_amount=st.integers(min_value=0, max_value=10000000),
-    category=st.sampled_from(['Tax', 'Labor', 'Environmental', 'Corporate', 'Trade']),
-    missed_deadlines=st.integers(min_value=0, max_value=10)
-)
-def test_risk_level_calculation(days_until_deadline, penalty_amount, category, missed_deadlines):
-    """
-    Feature: ai-compliance-monitoring-msme
-    Property 20: Risk level calculation
-    """
-    notice = ComplianceNotice(
-        deadline=datetime.now() + timedelta(days=days_until_deadline),
-        penalty_amount=penalty_amount,
-        category=category
-    )
-    history = ComplianceHistory(missed_deadlines_count=missed_deadlines)
-    
-    risk_level = calculate_risk_level(notice, history)
-    
-    # Verify risk level is one of the valid values
-    assert risk_level in ['Critical', 'High', 'Medium', 'Low']
-    
-    # Verify Critical classification rules
-    if days_until_deadline <= 7 or penalty_amount >= 100000:
-        assert risk_level in ['Critical', 'High']  # Should be high priority
-    
-    # Verify Low classification rules
-    if days_until_deadline > 30 and penalty_amount < 10000 and missed_deadlines == 0:
-        assert risk_level in ['Low', 'Medium']  # Should be low priority
-```
+**Property Test Examples**: Use fast-check (Node.js) / Hypothesis (Python) with 100+ runs; e.g. Property 3—filter output must be only .gov.in/.nic.in senders; Property 20—risk level in {Critical,High,Medium,Low} and Critical/High when deadline ≤7 days or penalty ≥₹1,00,000.
 
 **Property Test Coverage**:
 - All 49 correctness properties must have corresponding property-based tests
@@ -1130,75 +683,7 @@ def test_risk_level_calculation(days_until_deadline, penalty_amount, category, m
 - Integration points between components
 - Mock external services (Bedrock, Textract, email providers)
 
-**Unit Test Examples**:
-
-```typescript
-// Email Retrieval - Edge Cases
-describe('Email Retrieval Handler', () => {
-  test('handles empty email list gracefully', async () => {
-    const result = await retrieveEmails(userId, lastSync);
-    expect(result.emails).toEqual([]);
-    expect(result.status).toBe('success');
-  });
-
-  test('handles OAuth token refresh failure', async () => {
-    mockSecretsManager.getSecretValue.mockRejectedValue(new Error('Token expired'));
-    
-    await expect(retrieveEmails(userId, lastSync)).rejects.toThrow();
-    expect(mockSNS.publish).toHaveBeenCalledWith(
-      expect.objectContaining({
-        Subject: expect.stringContaining('Re-authentication Required')
-      })
-    );
-  });
-
-  test('respects batch size limit of 100', async () => {
-    const emails = generateMockEmails(250);
-    const batches = createBatches(emails);
-    
-    expect(batches.length).toBe(3);
-    expect(batches[0].length).toBe(100);
-    expect(batches[1].length).toBe(100);
-    expect(batches[2].length).toBe(50);
-  });
-});
-```
-
-```python
-# Compliance Extraction - Specific Examples
-def test_extract_gst_filing_notice():
-    """Test extraction of a typical GST filing notice"""
-    email_body = """
-    Subject: GST Return Filing - GSTR-3B for March 2024
-    From: gst@gov.in
-    
-    Dear Taxpayer,
-    
-    This is to remind you that GSTR-3B for the month of March 2024 is due on 20th April 2024.
-    Late filing will attract a penalty of Rs. 50 per day (Rs. 20 per day for nil return).
-    
-    GSTIN: 29ABCDE1234F1Z5
-    """
-    
-    result = extract_compliance_info(email_body)
-    
-    assert result['isComplianceNotice'] == True
-    assert result['complianceType'] == 'Tax'
-    assert result['issuingAuthority'] == 'GST Department'
-    assert len(result['deadlines']) == 1
-    assert result['deadlines'][0]['date'] == '2024-04-20'
-    assert result['penalties']['amount'] == 50
-
-def test_extract_notice_without_deadline():
-    """Test handling of notice without explicit deadline"""
-    email_body = "General information about labor law compliance."
-    
-    result = extract_compliance_info(email_body)
-    
-    assert result['isComplianceNotice'] == True
-    assert result['flagForManualReview'] == True
-    assert len(result['deadlines']) == 0
-```
+**Unit Test Examples**: Email retrieval—empty list returns success; OAuth refresh failure triggers SNS re-auth notification; batches respect max 100. Extraction—GST notice yields isComplianceNotice, Tax, authority, single deadline, penalty amount; notice without deadline yields flagForManualReview and empty deadlines.
 
 ### Integration Testing
 
