@@ -255,19 +255,20 @@ flowchart LR
 
 ```mermaid
 gantt
-    title Deadline Reminder Schedule (example: deadline = Day 0)
-    dateFormat  YYYY-MM-DD
+    title Deadline Reminder Schedule (Deadline = 2026-03-01)
+    dateFormat YYYY-MM-DD
+    axisFormat %d %b
     section Critical
-    Immediate alert     :crit,  -30d, 1d
-    1 day before       :crit,   -1d, 1d
+    Immediate alert        :crit, 2026-01-30, 1d
+    1 day before           :crit, 2026-02-28, 1d
     section High
-    7 days before       :high,   -7d, 1d
-    1 day before       :high,   -1d, 1d
+    7 days before          :high, 2026-02-22, 1d
+    1 day before           :high, 2026-02-28, 1d
     section Medium
-    14 days before      :med,   -14d, 1d
-    3 days before      :med,    -3d, 1d
+    14 days before         :med,  2026-02-15, 1d
+    3 days before          :med,  2026-02-26, 1d
     section Low
-    30 days before      :low,   -30d, 1d
+    30 days before         :low,  2026-01-30, 1d
 ```
 
 ---
