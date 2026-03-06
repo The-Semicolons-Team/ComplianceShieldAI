@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { handleGoogleCallback } from '@/lib/googleAuth';
 import { Shield } from 'lucide-react';
 
-export default function GoogleCallbackPage() {
+function GoogleCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
@@ -112,5 +112,29 @@ export default function GoogleCallbackPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function GoogleCallbackPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-primary-50 flex items-center justify-center px-4">
+        <div className="max-w-md w-full text-center">
+          <div className="flex justify-center mb-6">
+            <div className="bg-primary-600 rounded-full p-4">
+              <Shield className="h-12 w-12 text-white" />
+            </div>
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">Loading...</h1>
+            <div className="flex justify-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    }>
+      <GoogleCallbackContent />
+    </Suspense>
   );
 }
