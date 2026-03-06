@@ -1,0 +1,29 @@
+{
+  "name": "notification-handler",
+  "version": "1.0.0",
+  "description": "Lambda function for multi-channel notification delivery",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.490.0",
+    "@aws-sdk/client-secrets-manager": "^3.490.0",
+    "@aws-sdk/client-ses": "^3.490.0",
+    "@aws-sdk/client-sns": "^3.490.0",
+    "@aws-sdk/lib-dynamodb": "^3.490.0",
+    "axios": "^1.6.5"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.11",
+    "@types/node": "^20.11.0",
+    "eslint": "^8.56.0",
+    "fast-check": "^3.15.0",
+    "jest": "^29.7.0"
+  }
+}
