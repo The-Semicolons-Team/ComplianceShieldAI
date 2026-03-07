@@ -32,9 +32,13 @@ WHATSAPP_SECRET_ARN = os.environ.get('WHATSAPP_API_KEY_SECRET_ARN', '')
 # Reminder intervals per risk level (days before deadline)
 REMINDER_DAYS = {
     'Critical': [30, 14, 7, 1],
+    'critical': [30, 14, 7, 1],
     'High': [30, 14, 7, 1],
+    'high': [30, 14, 7, 1],
     'Medium': [14, 7, 1],
+    'medium': [14, 7, 1],
     'Low': [30],
+    'low': [30],
 }
 
 
@@ -223,9 +227,21 @@ def build_notification_content(message: Dict) -> Dict:
 
 def send_email(user_id: str, content: Dict) -> None:
     """Send email notification via SES."""
-    # In production, look up user email from user profile
-    # For now, we use user_id as email if it looks like an email
-    destination = user_id if '@' in user_id else f'{user_id}@example.com'
+    # Look up email from notification preferences table
+    destination = None
+    try:
+        prefs_table = dynamodb.Table(NOTIFICATION_PREFS_TABLE)
+        prefs = prefs_table.get_item(Key={'user_id': user_id}).get('Item', {})
+        destination = prefs.get('email_address') or prefs.get('email')
+    except Exception as e:
+        logger.warning(f'Could not lookup email for {user_id}: {e}')
+
+    if not destination:
+        destination = user_id if '@' in user_id else None
+
+    if not destination:
+        logger.warning(f'No email address found for user {user_id}, skipping email')
+        return
 
     ses_client.send_email(
         Source=EMAIL_FROM,
@@ -325,12 +341,12 @@ def process_daily_reminders() -> tuple:
 
     # Scan for active compliance notices with upcoming deadlines
     response = table.scan(
-        FilterExpression='#s IN (:p, :a) AND is_compliance_notice = :t',
+        FilterExpression='#s IN (:p, :a, :o)',
         ExpressionAttributeNames={'#s': 'status'},
         ExpressionAttributeValues={
             ':p': 'pending',
             ':a': 'acknowledged',
-            ':t': True,
+            ':o': 'overdue',
         },
     )
 
@@ -341,8 +357,6 @@ def process_daily_reminders() -> tuple:
         reminder_days = REMINDER_DAYS.get(risk_level, [30])
 
         for dl in item.get('deadlines', []):
-            if dl.get('type') != 'deadline':
-                continue
             try:
                 dl_date = date.fromisoformat(dl['date'])
                 days_until = (dl_date - today).days

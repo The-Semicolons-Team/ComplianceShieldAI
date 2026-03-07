@@ -179,16 +179,73 @@ def call_bedrock(text: str) -> Dict:
 
 def extract_attachment_text(email_data: Dict) -> str:
     """Extract text from email attachments using Textract."""
-    # In a real implementation, attachments would be downloaded and uploaded to S3
-    # then processed with Textract. This is a placeholder for the flow.
     try:
+        attachments = email_data.get('attachments', [])
+        if not attachments:
+            return ''
+
         attachment_text = ''
-        # For actual implementation:
-        # 1. Download attachment from email provider
-        # 2. Upload to S3 temp bucket
-        # 3. Call Textract
-        # 4. Get results
-        # 5. Delete from S3
+        s3 = boto3.client('s3')
+        textract = boto3.client('textract')
+        bucket = os.environ.get('TEMP_ATTACHMENT_BUCKET', '')
+
+        for att in attachments:
+            filename = att.get('filename', 'unknown')
+            content_bytes = att.get('data', b'')
+            if isinstance(content_bytes, str):
+                import base64
+                content_bytes = base64.b64decode(content_bytes)
+
+            if not content_bytes or not bucket:
+                continue
+
+            # Supported Textract formats
+            supported_ext = ('.pdf', '.png', '.jpg', '.jpeg', '.tiff')
+            if not any(filename.lower().endswith(ext) for ext in supported_ext):
+                logger.info(f'Skipping unsupported attachment type: {filename}')
+                continue
+
+            s3_key = f'temp-attachments/{uuid.uuid4()}/{filename}'
+            try:
+                # Upload to S3
+                s3.put_object(Bucket=bucket, Key=s3_key, Body=content_bytes)
+
+                # Call Textract
+                if filename.lower().endswith('.pdf'):
+                    # Use async for PDFs (multi-page)
+                    textract_response = textract.start_document_text_detection(
+                        DocumentLocation={'S3Object': {'Bucket': bucket, 'Name': s3_key}}
+                    )
+                    job_id = textract_response['JobId']
+                    # Poll for completion (simplified - max 30s)
+                    for _ in range(30):
+                        result = textract.get_document_text_detection(JobId=job_id)
+                        if result['JobStatus'] == 'SUCCEEDED':
+                            for block in result.get('Blocks', []):
+                                if block['BlockType'] == 'LINE':
+                                    attachment_text += block['Text'] + '\n'
+                            break
+                        elif result['JobStatus'] == 'FAILED':
+                            logger.warning(f'Textract failed for {filename}')
+                            break
+                        time.sleep(1)
+                else:
+                    # Sync API for images
+                    textract_response = textract.detect_document_text(
+                        Document={'S3Object': {'Bucket': bucket, 'Name': s3_key}}
+                    )
+                    for block in textract_response.get('Blocks', []):
+                        if block['BlockType'] == 'LINE':
+                            attachment_text += block['Text'] + '\n'
+
+                logger.info(f'Extracted {len(attachment_text)} chars from {filename}')
+            finally:
+                # Always clean up S3
+                try:
+                    s3.delete_object(Bucket=bucket, Key=s3_key)
+                except Exception:
+                    pass
+
         return attachment_text
     except Exception as e:
         logger.warning(f'Textract extraction failed, continuing without: {e}')

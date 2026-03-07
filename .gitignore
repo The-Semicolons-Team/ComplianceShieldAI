@@ -58,6 +58,31 @@ infrastructure/terraform.tfvars
 # AWS
 .aws-sam/
 
+# Lambda bundled pip dependencies (built by scripts/build-lambdas.sh)
+src/lambda/*/boto3/
+src/lambda/*/botocore/
+src/lambda/*/s3transfer/
+src/lambda/*/jmespath/
+src/lambda/*/urllib3/
+src/lambda/*/dateutil/
+src/lambda/*/six.py
+src/lambda/*/requests/
+src/lambda/*/certifi/
+src/lambda/*/charset_normalizer/
+src/lambda/*/idna/
+src/lambda/*/*.dist-info/
+src/lambda/*/google/
+src/lambda/*/google_auth*/
+src/lambda/*/google_api*/
+src/lambda/*/googleapiclient/
+src/lambda/*/httplib2/
+src/lambda/*/pyparsing*
+src/lambda/*/uritemplate/
+src/lambda/*/cachetools/
+src/lambda/*/pyasn1/
+src/lambda/*/rsa/
+src/lambda/*/bin/
+
 # Build artifacts
 *.zip
 dist/

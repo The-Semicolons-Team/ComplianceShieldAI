@@ -203,9 +203,19 @@ export class AppStack extends cdk.Stack {
       description: 'REST API handler for compliance data queries',
     });
 
+    // Demo Seed
+    const demoSeedFn = new lambda.Function(this, 'DemoSeedFunction', {
+      ...commonLambdaProps,
+      functionName: `${prefix}-demo-seed`,
+      handler: 'handler.handler',
+      code: lambda.Code.fromAsset(path.join(__dirname, '../../src/lambda/demo-seed')),
+      timeout: cdk.Duration.minutes(2),
+      description: 'Seeds DynamoDB with demo compliance data for hackathon',
+    });
+
     // ─── DynamoDB Permissions ───
     const allTables = [complianceTable, userIntegrationsTable, processedEmailsTable, notificationPrefsTable];
-    const allFunctions = [emailRetrievalFn, complianceExtractionFn, riskAssessmentFn, notificationHandlerFn, apiHandlerFn];
+    const allFunctions = [emailRetrievalFn, complianceExtractionFn, riskAssessmentFn, notificationHandlerFn, apiHandlerFn, demoSeedFn];
 
     for (const fn of allFunctions) {
       for (const table of allTables) {

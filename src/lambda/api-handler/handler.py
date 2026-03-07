@@ -97,7 +97,17 @@ def extract_user_id(event: Dict) -> Optional[str]:
     """Extract user ID from Cognito JWT authorizer."""
     auth = event.get('requestContext', {}).get('authorizer', {})
     claims = auth.get('claims', {})
-    return claims.get('sub') or claims.get('cognito:username') or event.get('headers', {}).get('x-user-id')
+    # Check Cognito claims first, then fallback to x-user-id header for demo
+    user = claims.get('sub') or claims.get('cognito:username')
+    if user:
+        return user
+    # Fallback: x-user-id header (case-insensitive header lookup)
+    headers = event.get('headers', {}) or {}
+    for key, val in headers.items():
+        if key.lower() == 'x-user-id':
+            return val
+    # Demo mode: default to demo-user so API is usable without auth
+    return 'demo-user'
 
 
 def get_notices(user_id: str, event: Dict) -> Dict:
@@ -141,7 +151,7 @@ def get_notices(user_id: str, event: Dict) -> Dict:
     items = response.get('Items', [])
 
     # Sort by risk level (Critical first), then deadline
-    risk_order = {'Critical': 0, 'High': 1, 'Medium': 2, 'Low': 3}
+    risk_order = {'critical': 0, 'Critical': 0, 'high': 1, 'High': 1, 'medium': 2, 'Medium': 2, 'low': 3, 'Low': 3}
     items.sort(key=lambda x: (risk_order.get(x.get('risk_level', 'Low'), 4), x.get('created_at', '')))
 
     return success_response({
@@ -189,28 +199,29 @@ def get_deadlines(user_id: str, event: Dict) -> Dict:
 
     response = table.query(
         KeyConditionExpression=Key('user_id').eq(user_id),
-        FilterExpression='is_compliance_notice = :t AND #s IN (:p, :a)',
+        FilterExpression='#s IN (:p, :a, :o)',
         ExpressionAttributeNames={'#s': 'status'},
         ExpressionAttributeValues={
-            ':t': True,
             ':p': 'pending',
             ':a': 'acknowledged',
+            ':o': 'overdue',
         },
     )
 
     deadlines = []
     for item in response.get('Items', []):
         for dl in item.get('deadlines', []):
-            if dl.get('type') == 'deadline':
-                deadlines.append({
-                    'notice_id': item['notice_id'],
-                    'subject': item.get('subject', ''),
-                    'compliance_category': item.get('compliance_category', ''),
-                    'risk_level': item.get('risk_level', 'Low'),
-                    'deadline_date': dl.get('date', ''),
-                    'deadline_description': dl.get('description', ''),
-                    'issuing_authority': item.get('issuing_authority', ''),
-                })
+            deadlines.append({
+                'notice_id': item['notice_id'],
+                'subject': item.get('subject', ''),
+                'compliance_category': item.get('compliance_category', ''),
+                'risk_level': item.get('risk_level', 'Low'),
+                'deadline_date': dl.get('date', ''),
+                'deadline_type': dl.get('type', ''),
+                'deadline_description': dl.get('description', ''),
+                'issuing_authority': item.get('issuing_authority', ''),
+                'is_mandatory': dl.get('is_mandatory', True),
+            })
 
     # Sort by deadline date
     deadlines.sort(key=lambda x: x.get('deadline_date', ''))
@@ -298,7 +309,8 @@ def get_dashboard_stats(user_id: str) -> Dict:
     )
     items = response.get('Items', [])
 
-    notices_only = [i for i in items if i.get('is_compliance_notice')]
+    # All items are compliance notices (no need to filter by is_compliance_notice)
+    notices_only = items
 
     stats = {
         'total_notices': len(notices_only),
@@ -323,12 +335,12 @@ def get_dashboard_stats(user_id: str) -> Dict:
         stats['by_status'][status] = stats['by_status'].get(status, 0) + 1
 
         for dl in item.get('deadlines', []):
-            if dl.get('type') == 'deadline' and dl.get('date'):
+            if dl.get('date'):
                 try:
                     dl_date = date_cls.fromisoformat(dl['date'])
                     if dl_date > today:
                         stats['upcoming_deadlines'] += 1
-                    elif dl_date <= today and status in ('pending', 'acknowledged'):
+                    elif dl_date <= today and status in ('pending', 'acknowledged', 'overdue'):
                         stats['overdue'] += 1
                 except (ValueError, TypeError):
                     pass
