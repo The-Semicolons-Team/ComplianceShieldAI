@@ -28,27 +28,8 @@ export class AmplifyStack extends cdk.Stack {
         { name: 'NEXT_PUBLIC_API_URL', value: props.apiUrl || '' },
         { name: 'NEXT_PUBLIC_AWS_REGION', value: 'ap-south-1' },
         { name: '_LIVE_UPDATES', value: '[{"name":"Node.js version","pkg":"node","type":"nvm","version":"20"}]' },
+        { name: 'AMPLIFY_MONOREPO_APP_ROOT', value: 'frontend' },
       ],
-      buildSpec: cdk.Fn.sub(`version: 1
-applications:
-  - frontend:
-      phases:
-        preBuild:
-          commands:
-            - npm ci
-        build:
-          commands:
-            - npm run build
-      artifacts:
-        baseDirectory: .next
-        files:
-          - '**/*'
-      cache:
-        paths:
-          - node_modules/**/*
-          - .next/cache/**/*
-    appRoot: frontend
-`),
       platform: 'WEB_COMPUTE',
     });
 
