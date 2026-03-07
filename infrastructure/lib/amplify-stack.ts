@@ -58,6 +58,23 @@ export class AmplifyStack extends cdk.Stack {
       description: 'Amplify App URL',
     });
 
+    // ─── Custom Domain (complianceshieldai.in via Route 53) ───
+    const customDomain = new amplify.CfnDomain(this, 'AmplifyDomain', {
+      appId: amplifyApp.attrAppId,
+      domainName: 'complianceshieldai.in',
+      subDomainSettings: [
+        { prefix: '', branchName: 'main' },
+        { prefix: 'www', branchName: 'main' },
+      ],
+      enableAutoSubDomain: false,
+    });
+    customDomain.addDependency(branch);
+
+    new cdk.CfnOutput(this, 'CustomDomainUrl', {
+      value: 'https://complianceshieldai.in',
+      description: 'Custom Domain URL',
+    });
+
     // Tags
     cdk.Tags.of(this).add('Project', 'ComplianceShield');
     cdk.Tags.of(this).add('Environment', env);
