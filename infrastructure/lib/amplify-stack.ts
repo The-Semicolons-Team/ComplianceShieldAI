@@ -27,7 +27,7 @@ export class AmplifyStack extends cdk.Stack {
       environmentVariables: [
         { name: 'NEXT_PUBLIC_API_URL', value: props.apiUrl || '' },
         { name: 'NEXT_PUBLIC_AWS_REGION', value: 'ap-south-1' },
-        { name: '_LIVE_UPDATES', value: '[{"name":"Node.js version","pkg":"node","type":"nvm","version":"18"}]' },
+        { name: '_LIVE_UPDATES', value: '[{"name":"Node.js version","pkg":"node","type":"nvm","version":"20"}]' },
       ],
       buildSpec: cdk.Fn.sub(`version: 1
 applications:

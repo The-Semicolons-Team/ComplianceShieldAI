@@ -57,7 +57,7 @@ export class PipelineStack extends cdk.Stack {
           install: {
             'runtime-versions': {
               python: '3.12',
-              nodejs: '18',
+              nodejs: '20',
             },
             commands: [
               'echo "Installing dependencies..."',
@@ -98,7 +98,8 @@ export class PipelineStack extends cdk.Stack {
           'base-directory': '.',
           files: [
             'build/**/*',
-            'infrastructure/cdk.out/**/*',
+            'infrastructure/**/*',
+            'src/**/*',
           ],
         },
         cache: {
@@ -252,7 +253,7 @@ function createDeployProject(
       phases: {
         install: {
           'runtime-versions': {
-            nodejs: '18',
+            nodejs: '20',
           },
           commands: [
             'cd infrastructure && npm ci',
