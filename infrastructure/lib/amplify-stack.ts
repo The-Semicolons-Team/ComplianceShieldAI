@@ -27,6 +27,10 @@ export class AmplifyStack extends cdk.Stack {
       environmentVariables: [
         { name: 'NEXT_PUBLIC_API_URL', value: props.apiUrl || '' },
         { name: 'NEXT_PUBLIC_AWS_REGION', value: 'ap-south-1' },
+        { name: 'NEXT_PUBLIC_USE_MOCK_AUTH', value: 'true' },
+        { name: 'NEXT_PUBLIC_APP_NAME', value: 'ComplianceShield' },
+        { name: 'NEXT_PUBLIC_APP_VERSION', value: '1.0.0' },
+        { name: 'NEXT_PUBLIC_GOOGLE_REDIRECT_URI', value: 'https://complianceshieldai.in/auth/google/callback' },
         { name: '_LIVE_UPDATES', value: '[{"name":"Node.js version","pkg":"node","type":"nvm","version":"20"}]' },
         { name: 'AMPLIFY_MONOREPO_APP_ROOT', value: 'frontend' },
       ],

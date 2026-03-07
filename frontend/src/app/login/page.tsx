@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
-import { Shield, Mail, Lock, AlertCircle } from 'lucide-react';
+import { Shield, Mail, Lock, AlertCircle, Info } from 'lucide-react';
 import { initiateGoogleLogin } from '@/lib/googleAuth';
 
 export default function LoginPage() {
@@ -12,8 +12,18 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleError, setGoogleError] = useState('');
   const { login } = useAuth();
   const router = useRouter();
+
+  function handleGoogleClick() {
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      setGoogleError('Google OAuth is not configured yet. Use email/password login for the demo — any credentials work!');
+      return;
+    }
+    initiateGoogleLogin();
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -141,7 +151,7 @@ export default function LoginPage() {
 
             <div className="mt-6 space-y-3">
               <button 
-                onClick={initiateGoogleLogin}
+                onClick={handleGoogleClick}
                 type="button"
                 className="flex items-center justify-center w-full px-4 py-3 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 transition-colors group"
               >
@@ -154,15 +164,24 @@ export default function LoginPage() {
                 <span className="text-gray-700 font-medium">Continue with Google</span>
               </button>
               
+              {googleError && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                  <div className="flex items-start">
+                    <Info className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                    <p className="ml-3 text-sm text-amber-800">{googleError}</p>
+                  </div>
+                </div>
+              )}
+
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <div className="flex items-start">
                   <div className="flex-shrink-0">
                     <Mail className="h-5 w-5 text-blue-600 mt-0.5" />
                   </div>
                   <div className="ml-3">
-                    <p className="text-sm font-medium text-blue-800">Gmail Access Required</p>
+                    <p className="text-sm font-medium text-blue-800">Demo Mode</p>
                     <p className="text-xs text-blue-700 mt-1">
-                      We'll request read-only access to your Gmail to automatically monitor government compliance emails and extract important deadlines.
+                      Enter any email and password to sign in. The dashboard shows real compliance data from the AWS backend.
                     </p>
                   </div>
                 </div>

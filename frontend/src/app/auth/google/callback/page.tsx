@@ -73,8 +73,9 @@ function GoogleCallbackContent() {
         // Clear processing flag
         localStorage.removeItem('oauth_processing');
 
-        // Redirect to dashboard
-        router.push('/dashboard');
+        // Full page redirect to dashboard (not client-side router.push)
+        // This forces AuthProvider to remount and re-read the updated localStorage
+        window.location.href = '/dashboard';
       } catch (err: any) {
         console.error('Google callback error:', err);
         localStorage.removeItem('oauth_processing');

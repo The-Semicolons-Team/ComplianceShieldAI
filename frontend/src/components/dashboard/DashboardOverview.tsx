@@ -7,7 +7,7 @@ import { useComplianceStore } from '@/store/complianceStore';
 import { format, differenceInDays } from 'date-fns';
 
 export default function DashboardOverview() {
-  const { notices, loading, fetchNotices } = useComplianceStore();
+  const { notices, dashboardStats, deadlines, loading, fetchNotices, fetchDashboardStats, fetchDeadlines } = useComplianceStore();
   const [stats, setStats] = useState({
     critical: 0,
     high: 0,
@@ -17,55 +17,61 @@ export default function DashboardOverview() {
     upcomingDeadlines: 0,
     acknowledged: 0,
     pending: 0,
+    overdue: 0,
   });
 
   useEffect(() => {
     fetchNotices();
-  }, [fetchNotices]);
+    fetchDashboardStats();
+    fetchDeadlines();
+  }, [fetchNotices, fetchDashboardStats, fetchDeadlines]);
 
   useEffect(() => {
-    if (notices.length > 0) {
-      const critical = notices.filter(n => n.risk_level === 'Critical').length;
-      const high = notices.filter(n => n.risk_level === 'High').length;
-      const medium = notices.filter(n => n.risk_level === 'Medium').length;
-      const low = notices.filter(n => n.risk_level === 'Low').length;
-      const acknowledged = notices.filter(n => n.status === 'acknowledged').length;
-      const pending = notices.filter(n => n.status === 'pending').length;
-      
-      const upcomingDeadlines = notices.filter(n => {
-        const deadline = new Date(n.deadlines[0]?.date);
-        const daysUntil = Math.ceil((deadline.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-        return daysUntil <= 30 && daysUntil > 0;
-      }).length;
-
+    if (dashboardStats) {
       setStats({
-        critical,
-        high,
-        medium,
-        low,
-        total: notices.length,
-        upcomingDeadlines,
-        acknowledged,
-        pending,
+        critical: dashboardStats.by_risk_level?.critical || dashboardStats.by_risk_level?.Critical || 0,
+        high: dashboardStats.by_risk_level?.high || dashboardStats.by_risk_level?.High || 0,
+        medium: dashboardStats.by_risk_level?.medium || dashboardStats.by_risk_level?.Medium || 0,
+        low: dashboardStats.by_risk_level?.low || dashboardStats.by_risk_level?.Low || 0,
+        total: dashboardStats.total_notices || 0,
+        upcomingDeadlines: dashboardStats.upcoming_deadlines || 0,
+        acknowledged: dashboardStats.by_status?.acknowledged || 0,
+        pending: (dashboardStats.by_status?.pending || 0) + (dashboardStats.by_status?.overdue || 0),
+        overdue: dashboardStats.overdue || 0,
       });
     }
-  }, [notices]);
+  }, [dashboardStats]);
 
-  const categoryData = [
-    { name: 'Tax', value: notices.filter(n => n.compliance_category === 'Tax').length, color: '#0ea5e9' },
-    { name: 'Labor', value: notices.filter(n => n.compliance_category === 'Labor').length, color: '#8b5cf6' },
-    { name: 'Corporate', value: notices.filter(n => n.compliance_category === 'Corporate').length, color: '#ec4899' },
-    { name: 'Environmental', value: notices.filter(n => n.compliance_category === 'Environmental').length, color: '#10b981' },
-    { name: 'Trade', value: notices.filter(n => n.compliance_category === 'Trade').length, color: '#f59e0b' },
-  ].filter(item => item.value > 0);
+  const categoryColors: Record<string, string> = {
+    'GST': '#0ea5e9',
+    'Tax': '#0ea5e9',
+    'Income Tax': '#6366f1',
+    'Corporate': '#ec4899',
+    'Banking': '#10b981',
+    'Securities': '#f59e0b',
+    'Labour': '#8b5cf6',
+    'Labor': '#8b5cf6',
+    'Environmental': '#14b8a6',
+    'Trade': '#f97316',
+    'Other': '#6b7280',
+  };
 
+  const categoryData = dashboardStats?.by_category
+    ? Object.entries(dashboardStats.by_category)
+        .filter(([, value]) => value > 0)
+        .map(([name, value]) => ({
+          name,
+          value,
+          color: categoryColors[name] || '#6b7280',
+        }))
+    : [];
+
+  // Use real stats for trend visualization
   const trendData = [
-    { month: 'Jan', notices: 12, critical: 2 },
-    { month: 'Feb', notices: 19, critical: 4 },
-    { month: 'Mar', notices: 15, critical: 3 },
-    { month: 'Apr', notices: 22, critical: 5 },
-    { month: 'May', notices: 18, critical: 2 },
-    { month: 'Jun', notices: 25, critical: 6 },
+    { month: 'Critical', notices: stats.critical, critical: stats.critical },
+    { month: 'High', notices: stats.high, critical: 0 },
+    { month: 'Medium', notices: stats.medium, critical: 0 },
+    { month: 'Low', notices: stats.low, critical: 0 },
   ];
 
   if (loading) {
@@ -84,7 +90,8 @@ export default function DashboardOverview() {
           <div>
             <h1 className="text-3xl font-bold mb-2">Welcome back! 👋</h1>
             <p className="text-primary-100 text-lg">
-              You have {stats.pending} pending compliance notices requiring attention
+              You have {stats.pending} pending compliance notices
+              {stats.overdue > 0 ? ` (${stats.overdue} overdue!)` : ''} requiring attention
             </p>
           </div>
           <div className="hidden md:block">
@@ -171,13 +178,11 @@ export default function DashboardOverview() {
         <div className="lg:col-span-2 bg-white rounded-xl shadow-lg p-6">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h3 className="text-xl font-bold text-gray-900">Compliance Trend</h3>
-              <p className="text-sm text-gray-500 mt-1">Monthly notice distribution</p>
+              <h3 className="text-xl font-bold text-gray-900">Risk Distribution</h3>
+              <p className="text-sm text-gray-500 mt-1">Current notice breakdown</p>
             </div>
             <select className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent">
-              <option>Last 6 months</option>
-              <option>Last 12 months</option>
-              <option>This year</option>
+              <option>Current</option>
             </select>
           </div>
           <ResponsiveContainer width="100%" height={300}>
@@ -290,19 +295,19 @@ export default function DashboardOverview() {
             <span className="text-sm text-gray-500">Next 30 days</span>
           </div>
           <div className="space-y-3">
-            {notices
-              .filter(n => {
-                const deadline = new Date(n.deadlines[0]?.date);
-                const daysUntil = differenceInDays(deadline, new Date());
-                return daysUntil <= 30 && daysUntil >= 0;
+            {deadlines
+              .filter(dl => {
+                const dlDate = new Date(dl.deadline_date);
+                const daysUntil = differenceInDays(dlDate, new Date());
+                return daysUntil >= 0;
               })
-              .sort((a, b) => new Date(a.deadlines[0]?.date).getTime() - new Date(b.deadlines[0]?.date).getTime())
+              .sort((a, b) => new Date(a.deadline_date).getTime() - new Date(b.deadline_date).getTime())
               .slice(0, 5)
-              .map((notice) => {
-                const deadline = new Date(notice.deadlines[0]?.date);
-                const daysUntil = differenceInDays(deadline, new Date());
+              .map((dl, idx) => {
+                const dlDate = new Date(dl.deadline_date);
+                const daysUntil = differenceInDays(dlDate, new Date());
                 return (
-                  <div key={notice.notice_id} className="flex items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                  <div key={`${dl.notice_id}-${idx}`} className="flex items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                     <div className={`w-12 h-12 rounded-lg flex items-center justify-center mr-4 ${
                       daysUntil <= 7 ? 'bg-red-100' : daysUntil <= 14 ? 'bg-orange-100' : 'bg-blue-100'
                     }`}>
@@ -320,13 +325,13 @@ export default function DashboardOverview() {
                       </div>
                     </div>
                     <div className="flex-1">
-                      <h4 className="text-sm font-semibold text-gray-900 mb-1">{notice.subject}</h4>
-                      <p className="text-xs text-gray-500">{format(deadline, 'EEEE, MMM dd')}</p>
+                      <h4 className="text-sm font-semibold text-gray-900 mb-1">{dl.deadline_description || dl.subject}</h4>
+                      <p className="text-xs text-gray-500">{format(dlDate, 'EEEE, MMM dd')} &middot; {dl.compliance_category}</p>
                     </div>
                   </div>
                 );
               })}
-            {stats.upcomingDeadlines === 0 && (
+            {deadlines.length === 0 && (
               <div className="text-center py-12">
                 <Calendar className="h-12 w-12 text-gray-300 mx-auto mb-3" />
                 <p className="text-gray-500">No upcoming deadlines</p>

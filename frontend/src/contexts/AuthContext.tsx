@@ -15,6 +15,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: (userData: User) => void;
   logout: () => Promise<void>;
   getAccessToken: () => Promise<string | null>;
 }
@@ -90,6 +91,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  function loginWithGoogle(userData: User) {
+    localStorage.setItem('user', JSON.stringify(userData));
+    setUser(userData);
+  }
+
   async function login(email: string, password: string) {
     try {
       if (USE_MOCK_AUTH) {
@@ -154,7 +160,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, getAccessToken }}>
+    <AuthContext.Provider value={{ user, loading, login, loginWithGoogle, logout, getAccessToken }}>
       {children}
     </AuthContext.Provider>
   );
