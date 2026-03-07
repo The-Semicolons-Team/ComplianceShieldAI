@@ -71,8 +71,12 @@ export default function NotificationsPage() {
       })),
   ].sort((a, b) => {
     // Overdue first, then by days until deadline
-    if (a.type === 'overdue' && b.type !== 'overdue') return -1;
-    if (b.type === 'overdue' && a.type !== 'overdue') return 1;
+    if (a.type === 'overdue' && b.type !== 'overdue') {
+      return -1;
+    }
+    if (b.type === 'overdue' && a.type !== 'overdue') {
+      return 1;
+    }
     return a.daysUntil - b.daysUntil;
   });
 
