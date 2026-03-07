@@ -262,18 +262,18 @@ function createDeployProject(
             nodejs: '20',
           },
           commands: [
-            'cd infrastructure && npm ci',
+            'cd $CODEBUILD_SRC_DIR/infrastructure && npm ci',
           ],
         },
         build: {
           commands: [
-            `cd infrastructure && npx cdk deploy ComplianceShield-App-${capitalize(environment)} --require-approval never --outputs-file ../outputs-${environment}.json`,
+            `cd $CODEBUILD_SRC_DIR/infrastructure && npx cdk deploy ComplianceShield-App-${capitalize(environment)} --require-approval never --outputs-file $CODEBUILD_SRC_DIR/outputs-${environment}.json`,
           ],
         },
         post_build: {
           commands: [
             `echo "Deployment to ${environment} completed"`,
-            `cat ../outputs-${environment}.json || true`,
+            `cat $CODEBUILD_SRC_DIR/outputs-${environment}.json || true`,
           ],
         },
       },
