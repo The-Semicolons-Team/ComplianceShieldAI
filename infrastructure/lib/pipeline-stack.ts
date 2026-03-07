@@ -98,8 +98,14 @@ export class PipelineStack extends cdk.Stack {
           'base-directory': '.',
           files: [
             'build/**/*',
-            'infrastructure/**/*',
-            'src/**/*',
+            'infrastructure/bin/**/*',
+            'infrastructure/lib/**/*',
+            'infrastructure/test/**/*',
+            'infrastructure/package.json',
+            'infrastructure/package-lock.json',
+            'infrastructure/tsconfig.json',
+            'infrastructure/cdk.json',
+            'infrastructure/jest.config.js',
           ],
         },
         cache: {
