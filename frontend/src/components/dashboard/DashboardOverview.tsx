@@ -346,33 +346,33 @@ export default function DashboardOverview() {
       <div className="bg-gradient-to-r from-primary-50 to-blue-50 rounded-xl p-6 border border-primary-100">
         <h3 className="text-lg font-bold text-gray-900 mb-4">Quick Actions</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <button className="flex items-center p-4 bg-white rounded-lg hover:shadow-md transition-all group">
+          <a href="/dashboard/emails" className="flex items-center p-4 bg-white rounded-lg hover:shadow-md transition-all group">
             <div className="bg-primary-100 rounded-lg p-3 mr-4 group-hover:bg-primary-200 transition-colors">
               <Mail className="h-6 w-6 text-primary-600" />
             </div>
             <div className="text-left">
-              <div className="font-semibold text-gray-900">Connect Email</div>
-              <div className="text-sm text-gray-500">Add email account</div>
+              <div className="font-semibold text-gray-900">Scan Emails</div>
+              <div className="text-sm text-gray-500">Scan Gmail for notices</div>
             </div>
-          </button>
-          <button className="flex items-center p-4 bg-white rounded-lg hover:shadow-md transition-all group">
+          </a>
+          <a href="/dashboard/analyze" className="flex items-center p-4 bg-white rounded-lg hover:shadow-md transition-all group">
             <div className="bg-orange-100 rounded-lg p-3 mr-4 group-hover:bg-orange-200 transition-colors">
               <Bell className="h-6 w-6 text-orange-600" />
             </div>
             <div className="text-left">
-              <div className="font-semibold text-gray-900">Notifications</div>
-              <div className="text-sm text-gray-500">Configure alerts</div>
+              <div className="font-semibold text-gray-900">AI Analyzer</div>
+              <div className="text-sm text-gray-500">Analyze documents</div>
             </div>
-          </button>
-          <button className="flex items-center p-4 bg-white rounded-lg hover:shadow-md transition-all group">
+          </a>
+          <a href="/dashboard/settings" className="flex items-center p-4 bg-white rounded-lg hover:shadow-md transition-all group">
             <div className="bg-green-100 rounded-lg p-3 mr-4 group-hover:bg-green-200 transition-colors">
               <Smartphone className="h-6 w-6 text-green-600" />
             </div>
             <div className="text-left">
-              <div className="font-semibold text-gray-900">WhatsApp</div>
-              <div className="text-sm text-gray-500">Enable WhatsApp</div>
+              <div className="font-semibold text-gray-900">Settings</div>
+              <div className="text-sm text-gray-500">Configure alerts</div>
             </div>
-          </button>
+          </a>
         </div>
       </div>
     </div>

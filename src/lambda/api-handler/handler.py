@@ -259,6 +259,12 @@ def get_notification_preferences(user_id: str) -> Dict:
             'channel_priority': ['email'],
             'quiet_hours_enabled': False,
             'batch_non_critical': True,
+            'alert_critical': True,
+            'alert_high': True,
+            'alert_medium': True,
+            'alert_low': False,
+            'reminder_days_before': 7,
+            'language': 'en',
         })
 
     return success_response(response['Item'])
@@ -283,6 +289,14 @@ def update_notification_preferences(user_id: str, event: Dict) -> Dict:
         'quiet_hours_timezone': body.get('quiet_hours_timezone', 'Asia/Kolkata'),
         'batch_non_critical': body.get('batch_non_critical', True),
         'critical_override_quiet_hours': body.get('critical_override_quiet_hours', True),
+        # Alert level thresholds
+        'alert_critical': body.get('alert_critical', True),
+        'alert_high': body.get('alert_high', True),
+        'alert_medium': body.get('alert_medium', True),
+        'alert_low': body.get('alert_low', False),
+        # Reminder and language preferences
+        'reminder_days_before': int(body.get('reminder_days_before', 7)),
+        'language': body.get('language', 'en'),
         'updated_at': datetime.utcnow().isoformat(),
     }
 

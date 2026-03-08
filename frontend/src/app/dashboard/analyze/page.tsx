@@ -58,7 +58,10 @@ interface AnalysisResult {
   notice_id?: string;
 }
 
-const SAMPLE_TEXT = `Subject: GST Return Filing Notice - GSTIN 29ABCDE1234F1Z5
+const SAMPLE_NOTICES: Record<string, { label: string; text: string }> = {
+  gst: {
+    label: 'GST Return Filing Notice',
+    text: `Subject: GST Return Filing Notice - GSTIN 29ABCDE1234F1Z5
 
 From: Central Board of Indirect Taxes and Customs (CBIC)
 Reference No: GST/NOT/2024/0847
@@ -85,7 +88,131 @@ This notice is issued under Section 46 read with Rule 68 of the CGST Rules, 2017
 Issued by:
 Assistant Commissioner, CGST Division-IV
 Bengaluru, Karnataka
-Date: 30th November 2024`;
+Date: 30th November 2024`,
+  },
+  income_tax: {
+    label: 'Income Tax Scrutiny Notice',
+    text: `OFFICE OF THE ASSISTANT COMMISSIONER OF INCOME TAX
+CIRCLE 1(1), NEW DELHI
+
+NOTICE UNDER SECTION 143(2) OF THE INCOME TAX ACT, 1961
+
+To: M/s TechSolutions Pvt Ltd
+PAN: AABCT1234E
+Assessment Year: 2023-24
+Reference No: ACIT/C-1(1)/143(2)/2024-25/1287
+
+Sir/Madam,
+
+Whereas a return of income for the Assessment Year 2023-24 was filed by you on 31st October 2023 declaring a total income of ₹2,45,67,890/-, the same has been selected for scrutiny assessment.
+
+You are hereby required to attend this office on 20th January 2025 at 11:00 AM or cause to produce the following documents/information:
+
+1. Books of accounts including cash book, ledger, and journal for FY 2022-23
+2. Bank statements for all accounts maintained during FY 2022-23
+3. Details of all TDS certificates (Form 16A/26AS reconciliation)
+4. Supporting documents for deductions claimed under Section 80C, 80D, 80G
+5. Details of foreign remittances (Form 15CA/15CB) if any
+6. Invoices and contracts for major transactions exceeding ₹10,00,000
+
+IMPORTANT: Under Section 271(1)(b), failure to comply with this notice may attract a penalty of ₹10,000 for each default. Additionally, if the assessee fails to comply, the assessment may be completed to the best of judgment under Section 144.
+
+The notice is being issued as per the Risk Management Strategy of the CBDT and the guidelines issued vide Instruction No. 1/2023 dated 15th March 2023.
+
+Deadline for compliance: 20th January 2025
+
+(Authorized Signatory)
+Assistant Commissioner of Income Tax
+Circle 1(1), New Delhi
+Date: 15th December 2024
+DIN: ITBA/AST/F/143(2)/2024-25/1042876543`,
+  },
+  mca: {
+    label: 'MCA Annual Filing Notice',
+    text: `MINISTRY OF CORPORATE AFFAIRS
+REGISTRAR OF COMPANIES, MUMBAI
+
+NOTICE FOR NON-FILING OF ANNUAL RETURNS
+Under Section 403 read with Section 92 and 137 of the Companies Act, 2013
+
+CIN: U72200MH2019PTC123456
+Company Name: InnovateTech Solutions Private Limited
+Registered Office: 401, Business Park, Andheri East, Mumbai - 400093
+
+Notice Reference: ROC/MUM/STK-7/2024/NON-COMP/4521
+
+Dear Sir/Madam,
+
+It has come to the notice of this office that the following statutory filings are pending for your company:
+
+1. AOC-4 (Financial Statements) for FY 2023-24 - Due Date: 30th October 2024 (OVERDUE)
+2. MGT-7A (Annual Return) for FY 2023-24 - Due Date: 28th November 2024 (OVERDUE)
+3. ADT-1 (Auditor Appointment) - Not filed
+
+As per Section 403 of the Companies Act, 2013, an additional fee of ₹100 per day is applicable for each form beyond the due date. The current accumulated additional fees as on date are approximately ₹12,600 for AOC-4 and ₹4,200 for MGT-7A.
+
+CONSEQUENCES OF CONTINUED NON-COMPLIANCE:
+- The company may be marked for strike-off under Section 248(1)(c)
+- Directors may be disqualified under Section 164(2)
+- Prosecution proceedings under Section 92(5) and 137(3) with fine up to ₹5,00,000
+
+Required Actions:
+1. File AOC-4 with audited financial statements immediately
+2. File MGT-7A Annual Return within 15 days of this notice
+3. File ADT-1 for auditor appointment/re-appointment
+4. Pay all applicable additional fees through MCA portal (mca.gov.in)
+
+Final Deadline: 31st January 2025
+
+Failure to comply will result in initiation of strike-off proceedings and prosecution.
+
+Sd/-
+Registrar of Companies, Mumbai
+Ministry of Corporate Affairs
+Date: 10th December 2024`,
+  },
+  labour: {
+    label: 'EPFO Compliance Notice',
+    text: `EMPLOYEES' PROVIDENT FUND ORGANISATION
+(Ministry of Labour & Employment, Govt. of India)
+REGIONAL OFFICE, BENGALURU
+
+NOTICE UNDER SECTION 7A OF THE EPF & MP ACT, 1952
+
+Establishment Code: KA/BLR/12345
+Establishment Name: CloudServe Technologies Pvt Ltd
+Address: 3rd Floor, Tech Tower, Whitefield, Bengaluru - 560066
+
+Reference No: EPFO/KA/BLR/7A/2024/892
+
+Sir/Madam,
+
+During the inspection conducted on 25th November 2024, the following irregularities have been observed in the PF compliance of your establishment:
+
+1. DELAYED REMITTANCE: EPF contributions for September 2024 (₹4,23,890) and October 2024 (₹4,56,120) were remitted with a delay of 18 days and 12 days respectively. Under Section 7Q, interest at the rate of 12% p.a. is applicable on delayed payments.
+
+2. NON-ENROLLMENT: 12 employees who joined after 01st April 2024 with basic wages below ₹15,000/month have not been enrolled under the EPF scheme, in violation of Section 2(f) read with Para 26A of the EPF Scheme.
+
+3. WAGE DISCREPANCY: The PF contributions for 8 employees are being deposited on basic wages lower than their actual drawn basic wages as per payroll records.
+
+Total estimated dues including interest and damages: ₹3,87,650
+
+PENALTY: Under Section 14B of the EPF Act, damages up to 100% of the arrears may be levied. Additionally, prosecution under Section 14 may result in imprisonment up to 3 years and fine up to ₹10,000.
+
+Required Actions:
+1. Deposit arrears of ₹3,87,650 within 15 days
+2. Enroll all eligible employees immediately
+3. Submit revised ECR for affected months
+4. Appear before the undersigned on 10th January 2025 at 11:30 AM with all payroll records
+
+Deadline: 10th January 2025
+
+(Authorized Officer)
+Regional Provident Fund Commissioner
+EPFO Regional Office, Bengaluru
+Date: 5th December 2024`,
+  },
+};
 
 export default function AnalyzePage() {
   const { user, loading: authLoading } = useAuth();
@@ -155,8 +282,9 @@ export default function AnalyzePage() {
     }
   }
 
-  function loadSample() {
-    setText(SAMPLE_TEXT);
+  function loadSample(key?: string) {
+    const sampleKey = key || 'gst';
+    setText(SAMPLE_NOTICES[sampleKey]?.text || SAMPLE_NOTICES.gst.text);
     setFile(null);
     setResult(null);
     setError(null);
@@ -213,17 +341,20 @@ export default function AnalyzePage() {
 
         {/* Input Section */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <h2 className="text-lg font-semibold text-gray-900">Input</h2>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={loadSample}
-                className="px-3 py-1.5 text-sm bg-primary-50 text-primary-700 rounded-lg hover:bg-primary-100 transition-colors flex items-center gap-1"
-              >
-                <Sparkles className="h-4 w-4" />
-                Load Sample GST Notice
-              </button>
+            <div className="flex gap-2 flex-wrap">
+              {Object.entries(SAMPLE_NOTICES).map(([key, sample]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => loadSample(key)}
+                  className="px-3 py-1.5 text-sm bg-primary-50 text-primary-700 rounded-lg hover:bg-primary-100 transition-colors flex items-center gap-1"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  {sample.label}
+                </button>
+              ))}
               <button
                 type="button"
                 onClick={clearAll}

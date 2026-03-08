@@ -14,12 +14,20 @@ import {
   User,
   CheckCircle,
   Save,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
+import axios from 'axios';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
 
 export default function SettingsPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [loadingPrefs, setLoadingPrefs] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [prefs, setPrefs] = useState({
     emailNotifications: true,
@@ -32,6 +40,34 @@ export default function SettingsPage() {
     reminderDays: '7',
     language: 'en',
   });
+
+  // Fetch existing preferences from API on mount
+  useEffect(() => {
+    async function loadPrefs() {
+      try {
+        const res = await axios.get(`${API_URL}/preferences/notifications`, {
+          headers: { 'X-User-Id': 'demo-user' },
+        });
+        const data = res.data;
+        setPrefs({
+          emailNotifications: data.email_enabled ?? true,
+          smsNotifications: data.sms_enabled ?? false,
+          whatsappNotifications: data.whatsapp_enabled ?? false,
+          criticalAlerts: data.alert_critical ?? true,
+          highAlerts: data.alert_high ?? true,
+          mediumAlerts: data.alert_medium ?? true,
+          lowAlerts: data.alert_low ?? false,
+          reminderDays: String(data.reminder_days_before ?? 7),
+          language: data.language ?? 'en',
+        });
+      } catch (err) {
+        console.error('Failed to load preferences:', err);
+      } finally {
+        setLoadingPrefs(false);
+      }
+    }
+    loadPrefs();
+  }, []);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -47,9 +83,38 @@ export default function SettingsPage() {
     );
   }
 
-  function handleSave() {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+  async function handleSave() {
+    setSaving(true);
+    setError(null);
+    try {
+      await axios.put(
+        `${API_URL}/preferences/notifications`,
+        {
+          email_enabled: prefs.emailNotifications,
+          sms_enabled: prefs.smsNotifications,
+          whatsapp_enabled: prefs.whatsappNotifications,
+          alert_critical: prefs.criticalAlerts,
+          alert_high: prefs.highAlerts,
+          alert_medium: prefs.mediumAlerts,
+          alert_low: prefs.lowAlerts,
+          reminder_days_before: parseInt(prefs.reminderDays, 10),
+          language: prefs.language,
+          channel_priority: [
+            ...(prefs.emailNotifications ? ['email'] : []),
+            ...(prefs.smsNotifications ? ['sms'] : []),
+            ...(prefs.whatsappNotifications ? ['whatsapp'] : []),
+          ],
+        },
+        { headers: { 'X-User-Id': 'demo-user' } }
+      );
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err: any) {
+      console.error('Failed to save preferences:', err);
+      setError(err.response?.data?.error || 'Failed to save settings. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -62,6 +127,15 @@ export default function SettingsPage() {
           </p>
         </div>
 
+        {loadingPrefs ? (
+          <div className="flex justify-center py-16">
+            <div className="text-center">
+              <Loader2 className="h-8 w-8 animate-spin text-primary-600 mx-auto mb-3" />
+              <p className="text-sm text-gray-500">Loading preferences...</p>
+            </div>
+          </div>
+        ) : (
+        <>
         {/* Profile Section */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center gap-3 mb-4">
@@ -227,20 +301,38 @@ export default function SettingsPage() {
 
         {/* Save Button */}
         <div className="flex items-center justify-end gap-3">
+          {error && (
+            <span className="flex items-center text-sm text-red-600">
+              <AlertCircle className="h-4 w-4 mr-1" />
+              {error}
+            </span>
+          )}
           {saved && (
             <span className="flex items-center text-sm text-green-600">
               <CheckCircle className="h-4 w-4 mr-1" />
-              Settings saved
+              Settings saved successfully
             </span>
           )}
           <button
             onClick={handleSave}
-            className="inline-flex items-center px-6 py-2.5 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors"
+            disabled={saving}
+            className="inline-flex items-center px-6 py-2.5 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors"
           >
-            <Save className="h-4 w-4 mr-2" />
-            Save Settings
+            {saving ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4 mr-2" />
+                Save Settings
+              </>
+            )}
           </button>
         </div>
+        </>
+        )}
       </div>
     </DashboardLayout>
   );

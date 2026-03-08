@@ -148,6 +148,7 @@ export class AppStack extends cdk.Stack {
         NOTIFICATION_TOPIC_ARN: notificationTopic.topicArn,
         TEMP_ATTACHMENT_BUCKET: tempBucket.bucketName,
         BEDROCK_MODEL_ID: 'apac.amazon.nova-pro-v1:0',
+        EMAIL_FROM_ADDRESS: `noreply@complianceshieldai.in`,
       },
       logRetention: logs.RetentionDays.THREE_MONTHS,
     };
