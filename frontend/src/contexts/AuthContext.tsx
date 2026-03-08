@@ -133,14 +133,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem('gmail_access');
         localStorage.removeItem('gmail_tokens');
         localStorage.removeItem('oauth_processing');
+        localStorage.removeItem('google_oauth_state');
+        localStorage.removeItem('google_oauth_timestamp');
         setUser(null);
       } else {
         const { signOut } = await import('aws-amplify/auth');
         await signOut();
+        // Clear Google OAuth data as well
+        localStorage.removeItem('user');
+        localStorage.removeItem('gmail_access');
+        localStorage.removeItem('gmail_tokens');
+        localStorage.removeItem('oauth_processing');
+        localStorage.removeItem('google_oauth_state');
+        localStorage.removeItem('google_oauth_timestamp');
         setUser(null);
       }
     } catch (error) {
       console.error('Logout error:', error);
+      // Even if logout fails, clear local state
+      localStorage.clear();
+      setUser(null);
       throw error;
     }
   }

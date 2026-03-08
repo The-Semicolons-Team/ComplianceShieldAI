@@ -40,9 +40,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   async function handleLogout() {
     try {
       await logout();
-      router.push('/login');
+      // Force redirect to login page
+      window.location.href = '/login';
     } catch (error) {
       console.error('Logout failed:', error);
+      // Even if logout fails, redirect to login
+      window.location.href = '/login';
     }
   }
 
