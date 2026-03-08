@@ -95,8 +95,12 @@ export default function EmailScannerPage() {
   const unreadCount = emails.filter(e => e.isUnread).length;
 
   const filteredEmails = emails.filter(email => {
-    if (filterMode === 'compliance') { return email.isComplianceRelated; }
-    if (filterMode === 'unread') { return email.isUnread; }
+    if (filterMode === 'compliance') {
+      return email.isComplianceRelated;
+    }
+    if (filterMode === 'unread') {
+      return email.isUnread;
+    }
     return true;
   });
 
@@ -105,7 +109,9 @@ export default function EmailScannerPage() {
     .filter(e => e.isComplianceRelated)
     .reduce((acc, email) => {
       const cat = email.complianceCategory || 'Other';
-      if (!acc[cat]) { acc[cat] = []; }
+      if (!acc[cat]) {
+        acc[cat] = [];
+      }
       acc[cat].push(email);
       return acc;
     }, {} as Record<string, GmailMessage[]>);

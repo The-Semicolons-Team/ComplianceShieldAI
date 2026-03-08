@@ -51,7 +51,9 @@ export interface GmailTokens {
 export function getGmailTokens(): GmailTokens | null {
   try {
     const stored = localStorage.getItem('gmail_tokens');
-    if (!stored) { return null; }
+    if (!stored) {
+      return null;
+    }
     const tokens: GmailTokens = JSON.parse(stored);
     // Check if expired (with 5 min buffer)
     if (tokens.expires_at < Date.now() + 5 * 60 * 1000) {
@@ -143,7 +145,9 @@ async function fetchMessageDetail(
       { headers: { Authorization: `Bearer ${accessToken}` } }
     );
 
-    if (!response.ok) { return null; }
+    if (!response.ok) {
+      return null;
+    }
 
     const data = await response.json();
     return parseGmailMessage(data);
@@ -194,7 +198,9 @@ function parseGmailMessage(raw: any): GmailMessage {
  * Extract text body from Gmail message payload
  */
 function extractBody(payload: any): string {
-  if (!payload) { return ''; }
+  if (!payload) {
+    return '';
+  }
 
   // Simple text/plain body
   if (payload.mimeType === 'text/plain' && payload.body?.data) {
@@ -218,7 +224,9 @@ function extractBody(payload: any): string {
     // Recurse into nested parts
     for (const part of payload.parts) {
       const nested = extractBody(part);
-      if (nested) { return nested; }
+      if (nested) {
+        return nested;
+      }
     }
   }
 
@@ -289,43 +297,57 @@ function analyzeComplianceRelevance(text: string): {
   // Income Tax related
   if (/\b(income\s*tax|itr|tds|tcs|form\s*16|form\s*26as|pan\s*card|challan|assessment\s*year|a\.?y\.?)\b/i.test(text)) {
     tags.push('Income Tax');
-    if (!category) { category = 'Income Tax / Direct Tax'; }
+    if (!category) {
+      category = 'Income Tax / Direct Tax';
+    }
   }
 
   // MCA / Company Law
   if (/\b(mca|roc|annual\s*return|dir-?3|adt-?1|aoc-?4|mgt-?7|company\s*law|registrar\s*of\s*companies)\b/i.test(text)) {
     tags.push('MCA');
-    if (!category) { category = 'Company Law / MCA'; }
+    if (!category) {
+      category = 'Company Law / MCA';
+    }
   }
 
   // RBI related
   if (/\b(rbi|reserve\s*bank|fema|foreign\s*exchange|ecb|liberalised\s*remittance)\b/i.test(text)) {
     tags.push('RBI');
-    if (!category) { category = 'Banking / RBI'; }
+    if (!category) {
+      category = 'Banking / RBI';
+    }
   }
 
   // SEBI related
   if (/\b(sebi|securities|listing\s*obligation|insider\s*trading|lodr)\b/i.test(text)) {
     tags.push('SEBI');
-    if (!category) { category = 'Securities / SEBI'; }
+    if (!category) {
+      category = 'Securities / SEBI';
+    }
   }
 
   // EPFO / Labor
   if (/\b(epfo?|esi[c]?|provident\s*fund|pf\s*contribution|gratuity|labour\s*law|labor\s*law)\b/i.test(text)) {
     tags.push('EPFO');
-    if (!category) { category = 'Labour / EPFO'; }
+    if (!category) {
+      category = 'Labour / EPFO';
+    }
   }
 
   // FSSAI
   if (/\b(fssai|food\s*safety|food\s*license)\b/i.test(text)) {
     tags.push('FSSAI');
-    if (!category) { category = 'Food Safety / FSSAI'; }
+    if (!category) {
+      category = 'Food Safety / FSSAI';
+    }
   }
 
   // General compliance
   if (/\b(compliance|statutory|penalty|notice|filing\s*deadline|due\s*date|regulatory)\b/i.test(text)) {
     tags.push('Compliance');
-    if (!category) { category = 'General Compliance'; }
+    if (!category) {
+      category = 'General Compliance';
+    }
   }
 
   return {
