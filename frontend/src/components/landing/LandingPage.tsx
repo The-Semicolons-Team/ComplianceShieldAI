@@ -421,8 +421,14 @@ export default function LandingPage() {
               </ul>
             </div>
           </div>
-          <div className="border-t border-gray-800 mt-8 pt-8 text-sm text-center">
-            <p>&copy; 2026 ComplianceShield. All rights reserved. Made in India 🇮🇳</p>
+          <div className="border-t border-gray-800 mt-8 pt-8 text-sm">
+            <div className="flex flex-col sm:flex-row justify-between items-center">
+              <p>&copy; 2026 ComplianceShield. All rights reserved. Made in India 🇮🇳</p>
+              <div className="flex space-x-6 mt-4 sm:mt-0">
+                <Link href="/privacy" className="hover:text-white">Privacy Policy</Link>
+                <Link href="/terms" className="hover:text-white">Terms of Service</Link>
+              </div>
+            </div>
           </div>
         </div>
       </footer>
