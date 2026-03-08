@@ -41,15 +41,23 @@ export async function POST(request: NextRequest) {
     });
 
     if (!tokenResponse.ok) {
-      const error = await tokenResponse.text();
-      console.error('Token exchange failed:', error);
+      const errorText = await tokenResponse.text();
+      console.error('Token exchange failed:', errorText);
       console.error('Request details:', {
         code: code.substring(0, 20) + '...',
         redirect_uri,
         client_id: clientId,
       });
+      // Parse and return the actual Google error for debugging
+      let errorDetail = errorText;
+      try {
+        const parsed = JSON.parse(errorText);
+        errorDetail = parsed.error_description || parsed.error || errorText;
+      } catch {
+        // use raw text
+      }
       return NextResponse.json(
-        { error: 'Failed to exchange authorization code', details: error },
+        { error: errorDetail },
         { status: 400 }
       );
     }

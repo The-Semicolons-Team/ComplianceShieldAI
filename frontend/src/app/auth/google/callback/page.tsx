@@ -80,7 +80,7 @@ function GoogleCallbackContent() {
         console.error('Google callback error:', err);
         localStorage.removeItem('oauth_processing');
         setError(err.message || 'Authentication failed');
-        setTimeout(() => router.push('/login'), 3000);
+        // Don't auto-redirect — let user see the error and click back manually
       }
     }
 
@@ -99,8 +99,13 @@ function GoogleCallbackContent() {
         {error ? (
           <div>
             <h1 className="text-2xl font-bold text-gray-900 mb-4">Authentication Failed</h1>
-            <p className="text-gray-600 mb-6">{error}</p>
-            <p className="text-sm text-gray-500">Redirecting to login...</p>
+            <p className="text-red-600 mb-4 text-sm font-mono break-all bg-red-50 p-3 rounded">{error}</p>
+            <a
+              href="/login"
+              className="inline-block px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+            >
+              Back to Login
+            </a>
           </div>
         ) : (
           <div>

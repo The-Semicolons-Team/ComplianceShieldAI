@@ -7,11 +7,10 @@
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
 const REDIRECT_URI = process.env.NEXT_PUBLIC_GOOGLE_REDIRECT_URI || 'http://localhost:3000/auth/google/callback';
 
-// Gmail API Scopes - Request read-only access to Gmail
+// OAuth Scopes - basic profile info (no sensitive scopes for hackathon demo)
 const SCOPES = [
   'https://www.googleapis.com/auth/userinfo.email',
   'https://www.googleapis.com/auth/userinfo.profile',
-  'https://www.googleapis.com/auth/gmail.readonly', // Read-only access to Gmail
   'openid',
 ].join(' ');
 
