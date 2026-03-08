@@ -1,25 +1,25 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useState, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { handleGoogleCallback } from '@/lib/googleAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { Shield } from 'lucide-react';
 
 function GoogleCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { loginWithGoogle } = useAuth();
   const [error, setError] = useState<string | null>(null);
+  const processingRef = useRef(false);
 
   useEffect(() => {
-    let isProcessing = false;
-
     async function processCallback() {
       // Prevent double execution in React Strict Mode
-      if (isProcessing) {
-        console.log('⏭️ Skipping duplicate callback processing');
+      if (processingRef.current) {
         return;
       }
-      isProcessing = true;
+      processingRef.current = true;
 
       try {
         const code = searchParams.get('code');
@@ -34,27 +34,14 @@ function GoogleCallbackContent() {
         });
 
         if (errorParam) {
-          setError('Authentication cancelled or failed');
-          setTimeout(() => router.push('/login'), 3000);
+          setError(`Google returned error: ${errorParam}`);
           return;
         }
 
         if (!code || !state) {
-          setError('Invalid callback parameters');
-          setTimeout(() => router.push('/login'), 3000);
+          setError('Invalid callback parameters — missing code or state');
           return;
         }
-
-        // Check if already processed
-        const alreadyProcessed = localStorage.getItem('oauth_processing');
-        if (alreadyProcessed) {
-          console.log('✅ OAuth already processed, redirecting to dashboard...');
-          router.push('/dashboard');
-          return;
-        }
-
-        // Mark as processing
-        localStorage.setItem('oauth_processing', 'true');
 
         // Exchange code for tokens
         const result = await handleGoogleCallback(code, state);
@@ -66,10 +53,6 @@ function GoogleCallbackContent() {
           scopes: result.tokens.scope,
         });
 
-        // Store user data
-        localStorage.setItem('user', JSON.stringify(result.user));
-        localStorage.setItem('gmail_access', 'true');
-
         // Store Gmail tokens for email scanning feature
         if (result.tokens?.access_token) {
           localStorage.setItem('gmail_tokens', JSON.stringify({
@@ -78,24 +61,26 @@ function GoogleCallbackContent() {
             expires_at: Date.now() + (result.tokens.expires_in || 3600) * 1000,
             scope: result.tokens.scope,
           }));
+          localStorage.setItem('gmail_access', 'true');
         }
-        
-        // Clear processing flag
-        localStorage.removeItem('oauth_processing');
 
-        // Full page redirect to dashboard (not client-side router.push)
-        // This forces AuthProvider to remount and re-read the updated localStorage
-        window.location.href = '/dashboard';
+        // Update AuthContext directly — this sets the user in-memory AND persists to localStorage
+        loginWithGoogle({
+          userId: result.user.userId,
+          email: result.user.email,
+          name: result.user.name,
+        });
+
+        // Navigate to dashboard — works because AuthContext user is already set
+        router.push('/dashboard');
       } catch (err: any) {
         console.error('Google callback error:', err);
-        localStorage.removeItem('oauth_processing');
         setError(err.message || 'Authentication failed');
-        // Don't auto-redirect — let user see the error and click back manually
       }
     }
 
     processCallback();
-  }, [searchParams, router]);
+  }, [searchParams, router, loginWithGoogle]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-primary-50 flex items-center justify-center px-4">

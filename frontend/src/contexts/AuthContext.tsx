@@ -131,6 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem('mockUser');
         localStorage.removeItem('user');
         localStorage.removeItem('gmail_access');
+        localStorage.removeItem('gmail_tokens');
         localStorage.removeItem('oauth_processing');
         setUser(null);
       } else {
