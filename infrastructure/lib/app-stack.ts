@@ -147,7 +147,7 @@ export class AppStack extends cdk.Stack {
         EMAIL_PROCESSING_QUEUE_URL: emailQueue.queueUrl,
         NOTIFICATION_TOPIC_ARN: notificationTopic.topicArn,
         TEMP_ATTACHMENT_BUCKET: tempBucket.bucketName,
-        BEDROCK_MODEL_ID: 'anthropic.claude-3-sonnet-20240229-v1:0',
+        BEDROCK_MODEL_ID: 'apac.amazon.nova-lite-v1:0',
       },
       logRetention: logs.RetentionDays.THREE_MONTHS,
     };
@@ -200,7 +200,9 @@ export class AppStack extends cdk.Stack {
       functionName: `${prefix}-api-handler`,
       handler: 'handler.handler',
       code: lambda.Code.fromAsset(path.join(__dirname, '../../src/lambda/api-handler')),
-      description: 'REST API handler for compliance data queries',
+      timeout: cdk.Duration.minutes(3),
+      memorySize: 1024,
+      description: 'REST API handler for compliance data queries + AI analysis',
     });
 
     // Demo Seed
@@ -233,9 +235,14 @@ export class AppStack extends cdk.Stack {
 
     // ─── S3 Permissions ───
     tempBucket.grantReadWrite(complianceExtractionFn);
+    tempBucket.grantReadWrite(apiHandlerFn);
 
     // ─── Bedrock Permissions ───
     complianceExtractionFn.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['bedrock:InvokeModel'],
+      resources: ['*'],
+    }));
+    apiHandlerFn.addToRolePolicy(new iam.PolicyStatement({
       actions: ['bedrock:InvokeModel'],
       resources: ['*'],
     }));
@@ -246,6 +253,14 @@ export class AppStack extends cdk.Stack {
       resources: ['*'],
     }));
     complianceExtractionFn.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['comprehend:DetectEntities', 'comprehend:DetectKeyPhrases'],
+      resources: ['*'],
+    }));
+    apiHandlerFn.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['textract:DetectDocumentText', 'textract:StartDocumentTextDetection', 'textract:GetDocumentTextDetection'],
+      resources: ['*'],
+    }));
+    apiHandlerFn.addToRolePolicy(new iam.PolicyStatement({
       actions: ['comprehend:DetectEntities', 'comprehend:DetectKeyPhrases'],
       resources: ['*'],
     }));
@@ -370,6 +385,12 @@ export class AppStack extends cdk.Stack {
     const dashboard = api.root.addResource('dashboard');
     const stats = dashboard.addResource('stats');
     stats.addMethod('GET', lambdaIntegration);
+
+    const test = api.root.addResource('test');
+    const analyze = test.addResource('analyze');
+    analyze.addMethod('POST', lambdaIntegration);
+    const textract = test.addResource('textract');
+    textract.addMethod('POST', lambdaIntegration);
 
     // ─── CloudWatch Dashboard ───
     const dashboardWidget = new cloudwatch.Dashboard(this, 'AppDashboard', {

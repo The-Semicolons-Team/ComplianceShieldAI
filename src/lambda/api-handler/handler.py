@@ -1,11 +1,14 @@
 """
 API Handler Lambda Function (Python)
 REST API endpoints for querying compliance data, managing user preferences,
-and handling OAuth callbacks.
+handling OAuth callbacks, and live AI document analysis.
 """
 import json
 import os
 import logging
+import uuid
+import base64
+import time
 from datetime import datetime
 from typing import Dict, Any, Optional
 from decimal import Decimal
@@ -18,12 +21,18 @@ logger.setLevel(os.environ.get('LOG_LEVEL', 'INFO'))
 
 # AWS clients
 dynamodb = boto3.resource('dynamodb')
+bedrock_runtime = boto3.client('bedrock-runtime')
+textract_client = boto3.client('textract')
+comprehend_client = boto3.client('comprehend')
+s3_client = boto3.client('s3')
 
 # Environment
 ENVIRONMENT = os.environ.get('ENVIRONMENT', 'dev')
 COMPLIANCE_TABLE = os.environ.get('COMPLIANCE_METADATA_TABLE', f'compliance-shield-{ENVIRONMENT}-compliance-metadata')
 NOTIFICATION_PREFS_TABLE = os.environ.get('NOTIFICATION_PREFERENCES_TABLE', f'compliance-shield-{ENVIRONMENT}-notification-preferences')
 USER_INTEGRATIONS_TABLE = os.environ.get('USER_INTEGRATIONS_TABLE', f'compliance-shield-{ENVIRONMENT}-user-integrations')
+BEDROCK_MODEL_ID = os.environ.get('BEDROCK_MODEL_ID', 'anthropic.claude-3-sonnet-20240229-v1:0')
+TEMP_BUCKET = os.environ.get('TEMP_ATTACHMENT_BUCKET', '')
 
 
 class DecimalEncoder(json.JSONEncoder):
@@ -84,6 +93,12 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # Dashboard stats
         elif path == '/dashboard/stats' and method == 'GET':
             return get_dashboard_stats(user_id)
+
+        # AI Analysis endpoints (hackathon demo)
+        elif path == '/test/analyze' and method == 'POST':
+            return analyze_document(user_id, event)
+        elif path == '/test/textract' and method == 'POST':
+            return run_textract(user_id, event)
 
         else:
             return error_response(404, f'Not found: {method} {path}')
@@ -346,6 +361,288 @@ def get_dashboard_stats(user_id: str) -> Dict:
                     pass
 
     return success_response(stats)
+
+
+# ─── AI Analysis Endpoints ───
+
+ANALYSIS_SYSTEM_PROMPT = """You are an expert in Indian government compliance notices. Analyze the given text and extract structured compliance information.
+
+Return a valid JSON object with these fields:
+{
+  "isComplianceNotice": boolean,
+  "complianceType": "string describing the type (e.g. GST Return Filing, Income Tax Notice, MCA Annual Return)",
+  "complianceCategory": "Tax" | "Labor" | "Environmental" | "Corporate" | "Trade" | "Other",
+  "issuingAuthority": "name of the government authority",
+  "referenceNumber": "reference/notice number if found",
+  "subject": "subject line or title of the notice",
+  "summary": "2-3 sentence summary of what this notice requires",
+  "deadlines": [{"date": "YYYY-MM-DD", "type": "issue|effective|deadline", "description": "what is due"}],
+  "requiredActions": ["list of specific actions required"],
+  "penalties": {"amount": number, "currency": "INR", "description": "penalty details"} or null,
+  "applicableRegulations": ["list of referenced regulations, sections, acts"],
+  "keywords": ["compliance", "related", "keywords"],
+  "riskLevel": "Critical" | "High" | "Medium" | "Low",
+  "riskJustification": "why this risk level was assigned"
+}
+
+If the text is NOT a compliance notice, set isComplianceNotice to false and fill other fields as empty/null.
+Always respond with ONLY valid JSON, no markdown fences or explanation."""
+
+
+def analyze_document(user_id: str, event: Dict) -> Dict:
+    """
+    Analyze a document/email text using Bedrock AI + optional Textract + Comprehend.
+    Accepts: { "text": "...", "attachment": "base64...", "filename": "doc.pdf", "save": true/false }
+    """
+    body = parse_body(event)
+    email_text = body.get('text', '')
+    attachment_b64 = body.get('attachment', '')
+    filename = body.get('filename', '')
+    save_result = body.get('save', False)
+
+    if not email_text and not attachment_b64:
+        return error_response(400, 'Provide "text" (email body) or "attachment" (base64 document)')
+
+    result = {
+        'textract': None,
+        'bedrock': None,
+        'comprehend': None,
+        'saved': False,
+    }
+
+    # Step 1: Textract — extract text from attachment if provided
+    attachment_text = ''
+    if attachment_b64 and filename:
+        try:
+            doc_bytes = base64.b64decode(attachment_b64)
+            attachment_text = _extract_text_with_textract(doc_bytes, filename)
+            result['textract'] = {
+                'extracted_chars': len(attachment_text),
+                'filename': filename,
+                'preview': attachment_text[:500],
+            }
+        except Exception as e:
+            logger.error(f'Textract error: {e}')
+            result['textract'] = {'error': str(e)}
+
+    # Step 2: Combine text
+    combined_text = ''
+    if email_text:
+        combined_text = email_text
+    if attachment_text:
+        combined_text += f'\n\n--- Extracted from attachment ({filename}) ---\n{attachment_text}'
+
+    if not combined_text.strip():
+        return error_response(400, 'No text to analyze (email body empty and Textract found no text)')
+
+    # Step 3: Bedrock AI analysis
+    try:
+        bedrock_result = _call_bedrock_analysis(combined_text)
+        result['bedrock'] = bedrock_result
+    except Exception as e:
+        logger.error(f'Bedrock error: {e}')
+        result['bedrock'] = {'error': str(e)}
+
+    # Step 4: Comprehend entity/phrase extraction
+    try:
+        comprehend_result = _call_comprehend(combined_text[:100000])
+        result['comprehend'] = {
+            'entities': [
+                {'text': e['Text'], 'type': e['Type'], 'score': round(e.get('Score', 0), 3)}
+                for e in comprehend_result.get('entities', [])
+                if e.get('Score', 0) > 0.8
+            ][:20],
+            'key_phrases': [
+                p['Text'] for p in comprehend_result.get('key_phrases', [])
+                if p.get('Score', 0) > 0.9
+            ][:15],
+        }
+    except Exception as e:
+        logger.error(f'Comprehend error: {e}')
+        result['comprehend'] = {'error': str(e)}
+
+    # Step 5: Optionally save to DynamoDB as a real notice
+    if save_result and result.get('bedrock') and not result['bedrock'].get('error'):
+        try:
+            notice_id = str(uuid.uuid4())
+            _save_analysis(user_id, notice_id, result['bedrock'], combined_text)
+            result['saved'] = True
+            result['notice_id'] = notice_id
+        except Exception as e:
+            logger.error(f'Save error: {e}')
+            result['saved'] = False
+
+    return success_response(result)
+
+
+def run_textract(user_id: str, event: Dict) -> Dict:
+    """Run Textract only on an uploaded document. Returns extracted text."""
+    body = parse_body(event)
+    attachment_b64 = body.get('attachment', '')
+    filename = body.get('filename', 'document.pdf')
+
+    if not attachment_b64:
+        return error_response(400, 'Provide "attachment" (base64-encoded document)')
+
+    try:
+        doc_bytes = base64.b64decode(attachment_b64)
+        extracted_text = _extract_text_with_textract(doc_bytes, filename)
+        return success_response({
+            'filename': filename,
+            'extracted_chars': len(extracted_text),
+            'text': extracted_text,
+        })
+    except Exception as e:
+        logger.error(f'Textract error: {e}')
+        return error_response(500, f'Textract failed: {str(e)}')
+
+
+def _extract_text_with_textract(doc_bytes: bytes, filename: str) -> str:
+    """Extract text from a document using Textract."""
+    supported_ext = ('.pdf', '.png', '.jpg', '.jpeg', '.tiff')
+    if not any(filename.lower().endswith(ext) for ext in supported_ext):
+        raise ValueError(f'Unsupported file type: {filename}. Supported: {", ".join(supported_ext)}')
+
+    if filename.lower().endswith('.pdf') and TEMP_BUCKET:
+        # PDF: use async API via S3
+        s3_key = f'temp-analyze/{uuid.uuid4()}/{filename}'
+        s3_client.put_object(Bucket=TEMP_BUCKET, Key=s3_key, Body=doc_bytes)
+        try:
+            response = textract_client.start_document_text_detection(
+                DocumentLocation={'S3Object': {'Bucket': TEMP_BUCKET, 'Name': s3_key}}
+            )
+            job_id = response['JobId']
+            text_lines = []
+            for _ in range(60):
+                result = textract_client.get_document_text_detection(JobId=job_id)
+                status = result['JobStatus']
+                if status == 'SUCCEEDED':
+                    for block in result.get('Blocks', []):
+                        if block['BlockType'] == 'LINE':
+                            text_lines.append(block['Text'])
+                    # Handle pagination
+                    while result.get('NextToken'):
+                        result = textract_client.get_document_text_detection(
+                            JobId=job_id, NextToken=result['NextToken']
+                        )
+                        for block in result.get('Blocks', []):
+                            if block['BlockType'] == 'LINE':
+                                text_lines.append(block['Text'])
+                    break
+                elif status == 'FAILED':
+                    raise Exception(f'Textract job failed: {result.get("StatusMessage", "")}')
+                time.sleep(1)
+            return '\n'.join(text_lines)
+        finally:
+            try:
+                s3_client.delete_object(Bucket=TEMP_BUCKET, Key=s3_key)
+            except Exception:
+                pass
+    else:
+        # Images: use sync API (no S3 needed)
+        response = textract_client.detect_document_text(
+            Document={'Bytes': doc_bytes}
+        )
+        text_lines = []
+        for block in response.get('Blocks', []):
+            if block['BlockType'] == 'LINE':
+                text_lines.append(block['Text'])
+        return '\n'.join(text_lines)
+
+
+def _call_bedrock_analysis(text: str) -> Dict:
+    """Call Bedrock AI for compliance analysis. Supports Claude (Anthropic) and Nova (Amazon) models."""
+    user_prompt = f"""Analyze the following text for Indian government compliance notices. Extract all structured compliance data.
+
+TEXT:
+{text[:15000]}"""
+
+    model_id = BEDROCK_MODEL_ID
+    is_nova = 'nova' in model_id.lower()
+
+    if is_nova:
+        # Amazon Nova / Converse format
+        system_msg = [{'text': ANALYSIS_SYSTEM_PROMPT}]
+        request_body = json.dumps({
+            'system': system_msg,
+            'inferenceConfig': {'maxTokens': 4096},
+            'messages': [{'role': 'user', 'content': [{'text': user_prompt}]}],
+        })
+    else:
+        # Anthropic Claude format
+        request_body = json.dumps({
+            'anthropic_version': 'bedrock-2023-05-31',
+            'max_tokens': 4096,
+            'system': ANALYSIS_SYSTEM_PROMPT,
+            'messages': [{'role': 'user', 'content': user_prompt}],
+        })
+
+    response = bedrock_runtime.invoke_model(
+        modelId=model_id,
+        body=request_body,
+        contentType='application/json',
+    )
+
+    response_body = json.loads(response['body'].read())
+
+    if is_nova:
+        content = response_body.get('output', {}).get('message', {}).get('content', [{}])[0].get('text', '{}')
+    else:
+        content = response_body.get('content', [{}])[0].get('text', '{}')
+
+    # Parse JSON — handle potential markdown fences
+    content = content.strip()
+    if content.startswith('```'):
+        content = content.split('\n', 1)[1] if '\n' in content else content[3:]
+    if content.endswith('```'):
+        content = content[:-3]
+    content = content.strip()
+
+    return json.loads(content)
+
+
+def _call_comprehend(text: str) -> Dict:
+    """Use Comprehend for entity and key phrase extraction."""
+    try:
+        entities = comprehend_client.detect_entities(Text=text[:5000], LanguageCode='en')
+        key_phrases = comprehend_client.detect_key_phrases(Text=text[:5000], LanguageCode='en')
+        return {
+            'entities': entities.get('Entities', []),
+            'key_phrases': key_phrases.get('KeyPhrases', []),
+        }
+    except Exception as e:
+        logger.warning(f'Comprehend failed: {e}')
+        return {'entities': [], 'key_phrases': []}
+
+
+def _save_analysis(user_id: str, notice_id: str, bedrock_data: Dict, source_text: str) -> None:
+    """Save AI analysis result as a compliance notice in DynamoDB."""
+    table = dynamodb.Table(COMPLIANCE_TABLE)
+    table.put_item(Item={
+        'user_id': user_id,
+        'notice_id': notice_id,
+        'subject': bedrock_data.get('subject', 'AI-Analyzed Notice'),
+        'sender': bedrock_data.get('issuingAuthority', 'Unknown'),
+        'is_compliance_notice': bedrock_data.get('isComplianceNotice', True),
+        'compliance_type': bedrock_data.get('complianceType', ''),
+        'compliance_category': bedrock_data.get('complianceCategory', 'Other'),
+        'issuing_authority': bedrock_data.get('issuingAuthority', ''),
+        'reference_number': bedrock_data.get('referenceNumber', ''),
+        'deadlines': bedrock_data.get('deadlines', []),
+        'required_actions': bedrock_data.get('requiredActions', []),
+        'applicable_regulations': bedrock_data.get('applicableRegulations', []),
+        'keywords': bedrock_data.get('keywords', []),
+        'penalties': bedrock_data.get('penalties'),
+        'risk_level': bedrock_data.get('riskLevel', 'Medium'),
+        'risk_score': 50,
+        'status': 'pending',
+        'notification_sent': False,
+        'source': 'manual_analysis',
+        'summary': bedrock_data.get('summary', ''),
+        'created_at': datetime.utcnow().isoformat(),
+        'updated_at': datetime.utcnow().isoformat(),
+        'ttl': int(datetime.utcnow().timestamp()) + 220752000,
+    })
 
 
 # --- Utility functions ---
