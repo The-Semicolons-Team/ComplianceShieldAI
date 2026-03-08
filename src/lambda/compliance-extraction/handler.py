@@ -1,6 +1,6 @@
 """
 Compliance Extraction Lambda Function (Python)
-Analyzes government emails using AWS Bedrock (Claude), Textract, and Comprehend
+Analyzes government emails using AWS Bedrock (Amazon Nova Pro), Textract, and Comprehend
 to extract structured compliance information.
 """
 import json
@@ -25,7 +25,7 @@ dynamodb = boto3.resource('dynamodb')
 
 # Environment
 ENVIRONMENT = os.environ.get('ENVIRONMENT', 'dev')
-BEDROCK_MODEL_ID = os.environ.get('BEDROCK_MODEL_ID', 'anthropic.claude-3-sonnet-20240229-v1:0')
+BEDROCK_MODEL_ID = os.environ.get('BEDROCK_MODEL_ID', 'apac.amazon.nova-pro-v1:0')
 COMPLIANCE_TABLE = os.environ.get('COMPLIANCE_METADATA_TABLE', f'compliance-shield-{ENVIRONMENT}-compliance-metadata')
 PROCESSED_EMAILS_TABLE = os.environ.get('PROCESSED_EMAILS_TABLE', f'compliance-shield-{ENVIRONMENT}-processed-emails')
 TEMP_BUCKET = os.environ.get('TEMP_ATTACHMENT_BUCKET', f'compliance-shield-{ENVIRONMENT}-temp-attachments')
@@ -136,16 +136,15 @@ def process_email(user_id: str, email_data: Dict) -> None:
 
 
 def call_bedrock(text: str) -> Dict:
-    """Call AWS Bedrock (Claude) for compliance analysis."""
+    """Call Amazon Bedrock (Nova Pro) for compliance analysis."""
     try:
         user_prompt = f"Analyze this email for Indian government compliance notices:\n\n{text}"
 
         request_body = json.dumps({
-            'anthropic_version': 'bedrock-2023-05-31',
-            'max_tokens': 4096,
-            'system': SYSTEM_PROMPT,
+            'system': [{'text': SYSTEM_PROMPT}],
+            'inferenceConfig': {'maxTokens': 4096},
             'messages': [
-                {'role': 'user', 'content': user_prompt},
+                {'role': 'user', 'content': [{'text': user_prompt}]},
             ],
         })
 
@@ -156,7 +155,17 @@ def call_bedrock(text: str) -> Dict:
         )
 
         response_body = json.loads(response['body'].read())
-        content = response_body.get('content', [{}])[0].get('text', '{}')
+        content = response_body.get('output', {}).get('message', {}).get('content', [{}])[0].get('text', '{}')
+
+        # Handle potential markdown fences
+        content = content.strip()
+        if content.startswith('```'):
+            content = content.split('\n', 1)[1] if '\n' in content else content[3:]
+        if content.endswith('```'):
+            content = content[:-3]
+        content = content.strip()
+
+        return json.loads(content)
 
         return json.loads(content)
 

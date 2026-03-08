@@ -79,7 +79,7 @@ The architecture follows AWS Well-Architected Framework principles with emphasis
 
 **Components**:
 - **Lambda Function**: `compliance-extraction-handler` (Python 3.12 on ARM64, 3GB memory, 5min timeout)
-- **Amazon Bedrock**: Claude 3 Sonnet for compliance analysis
+- **Amazon Bedrock**: Amazon Nova Pro for compliance analysis
 - **Amazon Textract**: PDF and image text extraction
 - **Amazon Comprehend**: Entity recognition and key phrase extraction
 

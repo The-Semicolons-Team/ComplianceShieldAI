@@ -206,7 +206,7 @@ export default function AnalyzePage() {
               AI Document Analyzer
             </h1>
             <p className="text-gray-500 mt-1">
-              Analyze compliance notices using Amazon Bedrock (Claude 3 Sonnet), Textract &amp; Comprehend
+              Analyze compliance notices using Amazon Bedrock (Nova Pro), Textract &amp; Comprehend
             </p>
           </div>
         </div>
@@ -315,7 +315,7 @@ export default function AnalyzePage() {
               <div className="text-center">
                 <p className="font-semibold text-gray-900">AI Analysis in Progress</p>
                 <p className="text-sm text-gray-500 mt-1">
-                  Running Textract → Bedrock Claude 3 Sonnet → Comprehend pipeline...
+                  Running Textract → Bedrock Nova Pro → Comprehend pipeline...
                 </p>
               </div>
             </div>

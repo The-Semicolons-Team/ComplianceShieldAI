@@ -181,7 +181,7 @@ This implementation plan breaks down the AI Compliance Monitoring System into di
     - **Validates: Requirements 8.8**
 
   - [ ] 6.2 Integrate AWS Bedrock for compliance analysis (Python)
-    - Configure Bedrock client for Claude 3 Sonnet model
+    - Configure Bedrock client for Amazon Nova Pro model
     - Create structured prompt for Indian government compliance notices
     - Define JSON schema for extraction output
     - Send combined text to Bedrock with prompt

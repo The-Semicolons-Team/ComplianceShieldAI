@@ -31,7 +31,7 @@ ENVIRONMENT = os.environ.get('ENVIRONMENT', 'dev')
 COMPLIANCE_TABLE = os.environ.get('COMPLIANCE_METADATA_TABLE', f'compliance-shield-{ENVIRONMENT}-compliance-metadata')
 NOTIFICATION_PREFS_TABLE = os.environ.get('NOTIFICATION_PREFERENCES_TABLE', f'compliance-shield-{ENVIRONMENT}-notification-preferences')
 USER_INTEGRATIONS_TABLE = os.environ.get('USER_INTEGRATIONS_TABLE', f'compliance-shield-{ENVIRONMENT}-user-integrations')
-BEDROCK_MODEL_ID = os.environ.get('BEDROCK_MODEL_ID', 'anthropic.claude-3-sonnet-20240229-v1:0')
+BEDROCK_MODEL_ID = os.environ.get('BEDROCK_MODEL_ID', 'apac.amazon.nova-pro-v1:0')
 TEMP_BUCKET = os.environ.get('TEMP_ATTACHMENT_BUCKET', '')
 
 
@@ -551,44 +551,26 @@ def _extract_text_with_textract(doc_bytes: bytes, filename: str) -> str:
 
 
 def _call_bedrock_analysis(text: str) -> Dict:
-    """Call Bedrock AI for compliance analysis. Supports Claude (Anthropic) and Nova (Amazon) models."""
+    """Call Amazon Bedrock (Nova Pro) for compliance analysis."""
     user_prompt = f"""Analyze the following text for Indian government compliance notices. Extract all structured compliance data.
 
 TEXT:
 {text[:15000]}"""
 
-    model_id = BEDROCK_MODEL_ID
-    is_nova = 'nova' in model_id.lower()
-
-    if is_nova:
-        # Amazon Nova / Converse format
-        system_msg = [{'text': ANALYSIS_SYSTEM_PROMPT}]
-        request_body = json.dumps({
-            'system': system_msg,
-            'inferenceConfig': {'maxTokens': 4096},
-            'messages': [{'role': 'user', 'content': [{'text': user_prompt}]}],
-        })
-    else:
-        # Anthropic Claude format
-        request_body = json.dumps({
-            'anthropic_version': 'bedrock-2023-05-31',
-            'max_tokens': 4096,
-            'system': ANALYSIS_SYSTEM_PROMPT,
-            'messages': [{'role': 'user', 'content': user_prompt}],
-        })
+    request_body = json.dumps({
+        'system': [{'text': ANALYSIS_SYSTEM_PROMPT}],
+        'inferenceConfig': {'maxTokens': 4096},
+        'messages': [{'role': 'user', 'content': [{'text': user_prompt}]}],
+    })
 
     response = bedrock_runtime.invoke_model(
-        modelId=model_id,
+        modelId=BEDROCK_MODEL_ID,
         body=request_body,
         contentType='application/json',
     )
 
     response_body = json.loads(response['body'].read())
-
-    if is_nova:
-        content = response_body.get('output', {}).get('message', {}).get('content', [{}])[0].get('text', '{}')
-    else:
-        content = response_body.get('content', [{}])[0].get('text', '{}')
+    content = response_body.get('output', {}).get('message', {}).get('content', [{}])[0].get('text', '{}')
 
     # Parse JSON — handle potential markdown fences
     content = content.strip()
