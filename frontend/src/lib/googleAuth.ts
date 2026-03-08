@@ -7,10 +7,11 @@
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
 const REDIRECT_URI = process.env.NEXT_PUBLIC_GOOGLE_REDIRECT_URI || 'http://localhost:3000/auth/google/callback';
 
-// OAuth Scopes - basic profile info (no sensitive scopes for hackathon demo)
+// OAuth Scopes - profile + Gmail read access for compliance email scanning
 const SCOPES = [
   'https://www.googleapis.com/auth/userinfo.email',
   'https://www.googleapis.com/auth/userinfo.profile',
+  'https://www.googleapis.com/auth/gmail.readonly',
   'openid',
 ].join(' ');
 

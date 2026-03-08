@@ -69,6 +69,16 @@ function GoogleCallbackContent() {
         // Store user data
         localStorage.setItem('user', JSON.stringify(result.user));
         localStorage.setItem('gmail_access', 'true');
+
+        // Store Gmail tokens for email scanning feature
+        if (result.tokens?.access_token) {
+          localStorage.setItem('gmail_tokens', JSON.stringify({
+            access_token: result.tokens.access_token,
+            refresh_token: result.tokens.refresh_token,
+            expires_at: Date.now() + (result.tokens.expires_in || 3600) * 1000,
+            scope: result.tokens.scope,
+          }));
+        }
         
         // Clear processing flag
         localStorage.removeItem('oauth_processing');

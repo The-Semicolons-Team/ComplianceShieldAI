@@ -14,6 +14,7 @@ import {
   Menu,
   X,
   User,
+  Mail,
 } from 'lucide-react';
 
 interface DashboardLayoutProps {
@@ -28,6 +29,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { name: 'Email Scanner', href: '/dashboard/emails', icon: Mail },
     { name: 'Compliance Notices', href: '/dashboard/notices', icon: FileText },
     { name: 'Notifications', href: '/dashboard/notifications', icon: Bell },
     { name: 'Settings', href: '/dashboard/settings', icon: Settings },
