@@ -18,7 +18,7 @@ export default function LandingPage() {
               <Link href="/login" className="text-gray-700 hover:text-primary-600 font-medium">
                 Login
               </Link>
-              <Link href="/signup" className="btn-primary">
+              <Link href="/login" className="btn-primary">
                 Get Started
               </Link>
             </div>
@@ -38,7 +38,7 @@ export default function LandingPage() {
             track deadlines, and get timely alerts via Email, SMS, and WhatsApp.
           </p>
           <div className="flex justify-center space-x-4">
-            <Link href="/signup" className="btn-primary text-lg px-8 py-4">
+            <Link href="/login" className="btn-primary text-lg px-8 py-4">
               Start Free Trial
             </Link>
             <Link href="#features" className="btn-secondary text-lg px-8 py-4">
@@ -227,7 +227,7 @@ export default function LandingPage() {
                   <span className="text-5xl font-bold text-gray-900">₹999</span>
                   <span className="text-gray-600 text-lg">/month</span>
                 </div>
-                <Link href="/signup?plan=starter" className="btn-primary w-full">
+                <Link href="/login" className="btn-primary w-full">
                   Start Free Trial
                 </Link>
               </div>
@@ -271,7 +271,7 @@ export default function LandingPage() {
                   <span className="text-5xl font-bold text-gray-900">₹2,499</span>
                   <span className="text-gray-600 text-lg">/month</span>
                 </div>
-                <Link href="/signup?plan=professional" className="btn-primary w-full">
+                <Link href="/login" className="btn-primary w-full">
                   Start Free Trial
                 </Link>
               </div>
@@ -377,7 +377,7 @@ export default function LandingPage() {
           <p className="text-xl text-primary-100 mb-8">
             Join hundreds of MSMEs using ComplianceShield to manage their compliance obligations
           </p>
-          <Link href="/signup" className="bg-white text-primary-600 px-8 py-4 rounded-lg font-semibold text-lg hover:bg-gray-100 transition-colors inline-block">
+          <Link href="/login" className="bg-white text-primary-600 px-8 py-4 rounded-lg font-semibold text-lg hover:bg-gray-100 transition-colors inline-block">
             Start Your Free Trial
           </Link>
         </div>
