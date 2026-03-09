@@ -15,6 +15,9 @@ export default function LandingPage() {
               <span className="ml-2 text-xl font-bold text-gray-900">ComplianceShield</span>
             </div>
             <div className="flex items-center space-x-4">
+              <Link href="/privacy" className="text-gray-700 hover:text-primary-600 text-sm">
+                Privacy
+              </Link>
               <Link href="/login" className="text-gray-700 hover:text-primary-600 font-medium">
                 Login
               </Link>
